@@ -30,6 +30,10 @@ export async function fetchVehiculoFleet(odooId) {
   return apiFetch(`/vehiculo/${odooId}/fleet`)
 }
 
-export async function fetchContrato(numero) {
-  return apiFetch(`/contrato/${encodeURIComponent(numero.toUpperCase())}`)
+export async function buscarContratos(q) {
+  return apiFetch(`/contratos?q=${encodeURIComponent(q)}`)
+}
+
+export async function fetchContratoById(odooId) {
+  return apiFetch(`/contratos/${odooId}`)
 }

@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, ArrowRight, Check, Search, FileText, Car, Building2 } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, Search, FileText, Car, Building2, X } from 'lucide-react'
 import { supabase } from '../lib/supabase'
-import { fetchVehiculos, fetchVehiculo, fetchContrato } from '../lib/odoo-api'
+import { fetchVehiculos, fetchVehiculo, buscarContratos, fetchContratoById } from '../lib/odoo-api'
 import { useAuth } from '../hooks/useAuth'
 
 const TIPOS_DANO = [
@@ -32,12 +32,21 @@ export default function SiniestroNuevo() {
   const { user } = useAuth()
   const [step, setStep] = useState(0)
   const [busquedaTipo, setBusquedaTipo] = useState('contrato')
+
+  // Estado para búsqueda por contrato
+  const [contratoQuery, setContratoQuery] = useState('')
+  const [contratoResultados, setContratoResultados] = useState([])
+  const [buscandoContrato, setBuscandoContrato] = useState(false)
+  const [contratoSeleccionado, setContratoSeleccionado] = useState(null)
+  const [cargandoDetalle, setCargandoDetalle] = useState(false)
+  const contratoTimer = useRef(null)
+
+  // Estado para búsqueda por placa
   const [vehiculos, setVehiculos] = useState([])
+  const [placaQuery, setPlacaQuery] = useState('')
+  const [placaSeleccionada, setPlacaSeleccionada] = useState(null)
   const [loadingVehiculos, setLoadingVehiculos] = useState(false)
-  const [contratoInput, setContratoInput] = useState('')
-  const [buscando, setBuscando] = useState(false)
-  const [vehiculoInfo, setVehiculoInfo] = useState(null)
-  const [contratoInfo, setContratoInfo] = useState(null)
+
   const [esInterno, setEsInterno] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -60,6 +69,7 @@ export default function SiniestroNuevo() {
     descripcion: '',
   })
 
+  // Cargar lista de vehículos para la pestaña de placa
   useEffect(() => {
     setLoadingVehiculos(true)
     fetchVehiculos()
@@ -72,13 +82,17 @@ export default function SiniestroNuevo() {
     return e => setForm(f => ({ ...f, [field]: e.target.value }))
   }
 
+  // ── Cambio de pestaña ──────────────────────────────────────
+
   function handleTipoBusquedaChange(tipo) {
     setBusquedaTipo(tipo)
     setSearchError('')
-    setVehiculoInfo(null)
-    setContratoInfo(null)
+    setContratoQuery('')
+    setContratoResultados([])
+    setContratoSeleccionado(null)
+    setPlacaQuery('')
+    setPlacaSeleccionada(null)
     setEsInterno(tipo === 'placa')
-    setContratoInput('')
     setForm(f => ({
       ...f,
       placa: '',
@@ -93,42 +107,94 @@ export default function SiniestroNuevo() {
     }))
   }
 
-  async function buscarContrato() {
-    if (!contratoInput.trim()) return
-    setBuscando(true)
+  // ── Búsqueda de contratos (debounced) ─────────────────────
+
+  function handleContratoQueryChange(e) {
+    const q = e.target.value.toUpperCase()
+    setContratoQuery(q)
+    setContratoSeleccionado(null)
     setSearchError('')
-    setVehiculoInfo(null)
-    setContratoInfo(null)
+    clearTimeout(contratoTimer.current)
+
+    if (q.length < 2) {
+      setContratoResultados([])
+      return
+    }
+    contratoTimer.current = setTimeout(async () => {
+      setBuscandoContrato(true)
+      try {
+        const data = await buscarContratos(q)
+        setContratoResultados(data.contratos ?? [])
+        if (!data.contratos?.length) setSearchError(`No se encontró ningún contrato con "${q}"`)
+      } catch (err) {
+        setSearchError(err.message)
+      } finally {
+        setBuscandoContrato(false)
+      }
+    }, 400)
+  }
+
+  async function handleSelectContrato(contrato) {
+    setContratoSeleccionado(contrato)
+    setContratoResultados([])
+    setContratoQuery(contrato.numero)
+    setSearchError('')
+    setCargandoDetalle(true)
     try {
-      const data = await fetchContrato(contratoInput.trim())
-      setContratoInfo(data.contrato)
-      setVehiculoInfo(data.vehiculo)
+      const data = await fetchContratoById(contrato.odoo_id)
       setForm(f => ({
         ...f,
         placa: data.vehiculo?.placa ?? '',
         tipo_vehiculo: data.vehiculo?.tipo_vehiculo ?? '',
         odoo_product_id: data.vehiculo?.odoo_id ?? null,
         contrato_id: data.contrato?.odoo_id ?? null,
-        contrato_numero: data.contrato?.contrato_numero ?? data.contrato?.numero ?? '',
+        contrato_numero: data.contrato?.numero ?? '',
         cliente_nombre: data.cliente?.nombre ?? '',
         cliente_dpi: data.cliente?.dpi ?? '',
         cliente_telefono: data.cliente?.telefono ?? '',
         cliente_email: data.cliente?.email ?? '',
       }))
     } catch (err) {
-      setSearchError(err.message)
+      setSearchError('Error cargando detalle: ' + err.message)
+      setContratoSeleccionado(null)
     } finally {
-      setBuscando(false)
+      setCargandoDetalle(false)
     }
   }
 
-  async function handlePlacaChange(placa) {
-    setForm(f => ({ ...f, placa }))
-    setVehiculoInfo(null)
-    if (!placa) return
+  function limpiarContrato() {
+    setContratoSeleccionado(null)
+    setContratoQuery('')
+    setContratoResultados([])
+    setSearchError('')
+    setForm(f => ({
+      ...f,
+      placa: '',
+      tipo_vehiculo: '',
+      odoo_product_id: null,
+      contrato_id: null,
+      contrato_numero: '',
+      cliente_nombre: '',
+      cliente_dpi: '',
+      cliente_telefono: '',
+      cliente_email: '',
+    }))
+  }
+
+  // ── Selección de placa ─────────────────────────────────────
+
+  const vehiculosFiltrados = placaQuery
+    ? vehiculos.filter(v =>
+        v.placa.includes(placaQuery.toUpperCase()) ||
+        v.tipo_vehiculo.toLowerCase().includes(placaQuery.toLowerCase())
+      )
+    : vehiculos
+
+  async function handleSelectPlaca(v) {
+    setPlacaSeleccionada(v)
+    setPlacaQuery(v.placa)
     try {
-      const data = await fetchVehiculo(placa)
-      setVehiculoInfo(data.vehiculo)
+      const data = await fetchVehiculo(v.placa)
       setForm(f => ({
         ...f,
         placa: data.vehiculo.placa,
@@ -142,13 +208,37 @@ export default function SiniestroNuevo() {
         cliente_email: '',
       }))
     } catch {
-      // vehículo sin datos adicionales
+      setForm(f => ({
+        ...f,
+        placa: v.placa,
+        tipo_vehiculo: v.tipo_vehiculo,
+        odoo_product_id: v.odoo_id,
+        contrato_id: null,
+        contrato_numero: '',
+        cliente_nombre: 'Pass Rent a Car (Interno)',
+      }))
     }
   }
 
+  function limpiarPlaca() {
+    setPlacaSeleccionada(null)
+    setPlacaQuery('')
+    setForm(f => ({
+      ...f,
+      placa: '',
+      tipo_vehiculo: '',
+      odoo_product_id: null,
+      cliente_nombre: 'Pass Rent a Car (Interno)',
+    }))
+  }
+
+  // ── Validación por paso ────────────────────────────────────
+
   const canProceedStep0 = busquedaTipo === 'contrato'
-    ? vehiculoInfo !== null
-    : form.placa !== ''
+    ? (contratoSeleccionado !== null && form.placa !== '' && !cargandoDetalle)
+    : (placaSeleccionada !== null)
+
+  // ── Submit ─────────────────────────────────────────────────
 
   async function handleSubmit() {
     setSaving(true)
@@ -181,6 +271,8 @@ export default function SiniestroNuevo() {
     }
   }
 
+  // ── Render ─────────────────────────────────────────────────
+
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       <div className="flex items-center gap-3">
@@ -201,7 +293,7 @@ export default function SiniestroNuevo() {
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
 
-        {/* PASO 0 — Vehículo */}
+        {/* ── PASO 0 — Vehículo ── */}
         {step === 0 && (
           <>
             <p className="text-sm font-medium text-gray-700">¿Cómo identificar el vehículo?</p>
@@ -231,67 +323,126 @@ export default function SiniestroNuevo() {
               </button>
             </div>
 
-            {busquedaTipo === 'contrato' ? (
-              <div className="space-y-3">
-                <label className="block text-sm font-medium text-gray-700">No. de contrato</label>
-                <div className="flex gap-2">
-                  <input
-                    value={contratoInput}
-                    onChange={e => setContratoInput(e.target.value.toUpperCase())}
-                    onKeyDown={e => e.key === 'Enter' && buscarContrato()}
-                    placeholder="RSV-00394 o CTO-00006"
-                    className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-red-500 font-mono"
-                  />
-                  <button
-                    onClick={buscarContrato}
-                    disabled={buscando || !contratoInput.trim()}
-                    className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed"
-                  >
-                    <Search size={15} />
-                    {buscando ? 'Buscando...' : 'Buscar'}
-                  </button>
-                </div>
+            {/* Búsqueda por contrato */}
+            {busquedaTipo === 'contrato' && (
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700">Buscar contrato</label>
 
-                {searchError && (
-                  <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">{searchError}</p>
-                )}
+                {!contratoSeleccionado ? (
+                  <>
+                    <div className="relative">
+                      <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                      <input
+                        value={contratoQuery}
+                        onChange={handleContratoQueryChange}
+                        placeholder="Escribe el número: 394, RSV-00394..."
+                        className="w-full pl-9 pr-4 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-red-500 font-mono"
+                        autoFocus
+                      />
+                      {buscandoContrato && (
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">Buscando...</span>
+                      )}
+                    </div>
 
-                {vehiculoInfo && contratoInfo && (
+                    {contratoResultados.length > 0 && (
+                      <div className="border border-gray-200 rounded-lg overflow-hidden shadow-sm">
+                        {contratoResultados.map(c => (
+                          <button
+                            key={c.odoo_id}
+                            onClick={() => handleSelectContrato(c)}
+                            className="w-full flex items-center justify-between px-4 py-3 text-sm hover:bg-red-50 border-b border-gray-100 last:border-0 text-left"
+                          >
+                            <div>
+                              <span className="font-semibold text-red-700 font-mono">{c.numero}</span>
+                              <span className="text-gray-600 ml-3">{c.cliente_nombre}</span>
+                            </div>
+                            <span className="text-xs text-gray-400">
+                              {c.fecha_orden ? new Date(c.fecha_orden).toLocaleDateString('es-GT') : ''}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
+                    {searchError && contratoQuery.length >= 2 && (
+                      <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">{searchError}</p>
+                    )}
+                  </>
+                ) : (
                   <div className="bg-green-50 border border-green-200 rounded-lg p-3 space-y-1 text-sm">
-                    <p className="font-semibold text-green-800">Contrato encontrado</p>
-                    <p className="text-green-700"><span className="font-medium">Contrato:</span> {contratoInfo.contrato_numero || contratoInfo.numero}</p>
-                    <p className="text-green-700"><span className="font-medium">Vehículo:</span> {vehiculoInfo.placa} — {vehiculoInfo.tipo_vehiculo}</p>
-                    <p className="text-green-700 truncate"><span className="font-medium">Descripción:</span> {vehiculoInfo.nombre}</p>
-                    {form.cliente_nombre && (
-                      <p className="text-green-700"><span className="font-medium">Cliente:</span> {form.cliente_nombre}</p>
+                    {cargandoDetalle ? (
+                      <p className="text-green-700 animate-pulse">Cargando datos del contrato...</p>
+                    ) : (
+                      <>
+                        <div className="flex items-start justify-between">
+                          <p className="font-semibold text-green-800">Contrato seleccionado</p>
+                          <button onClick={limpiarContrato} className="text-green-600 hover:text-green-800">
+                            <X size={16} />
+                          </button>
+                        </div>
+                        <p className="text-green-700"><span className="font-medium">No. Contrato:</span> <span className="font-mono">{form.contrato_numero}</span></p>
+                        {form.placa && <p className="text-green-700"><span className="font-medium">Vehículo:</span> {form.placa} — {form.tipo_vehiculo}</p>}
+                        {form.cliente_nombre && <p className="text-green-700"><span className="font-medium">Cliente:</span> {form.cliente_nombre}</p>}
+                      </>
                     )}
                   </div>
                 )}
               </div>
-            ) : (
+            )}
+
+            {/* Búsqueda por placa */}
+            {busquedaTipo === 'placa' && (
               <div className="space-y-3">
                 <div className="flex items-center gap-2 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
                   <Building2 size={15} className="shrink-0" />
                   Daño interno — se registrará como gasto de Pass Rent a Car
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Placa del vehículo</label>
-                  <select
-                    value={form.placa}
-                    onChange={e => handlePlacaChange(e.target.value)}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-red-500"
-                  >
-                    <option value="">{loadingVehiculos ? 'Cargando vehículos...' : 'Seleccionar placa'}</option>
-                    {vehiculos.map(v => (
-                      <option key={v.odoo_id} value={v.placa}>{v.placa} — {v.tipo_vehiculo}</option>
-                    ))}
-                  </select>
-                </div>
 
-                {vehiculoInfo && (
-                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-sm text-gray-600 space-y-1">
-                    <p><span className="font-medium">Tipo:</span> {vehiculoInfo.tipo_vehiculo}</p>
-                    <p className="truncate"><span className="font-medium">Descripción:</span> {vehiculoInfo.nombre}</p>
+                <label className="block text-sm font-medium text-gray-700">Buscar placa</label>
+
+                {!placaSeleccionada ? (
+                  <>
+                    <div className="relative">
+                      <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                      <input
+                        value={placaQuery}
+                        onChange={e => setPlacaQuery(e.target.value.toUpperCase())}
+                        placeholder={loadingVehiculos ? 'Cargando vehículos...' : 'Escribe la placa: P-521, C-513...'}
+                        disabled={loadingVehiculos}
+                        className="w-full pl-9 pr-4 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-red-500 font-mono"
+                        autoFocus
+                      />
+                    </div>
+
+                    {placaQuery.length >= 2 && (
+                      <div className="border border-gray-200 rounded-lg overflow-hidden shadow-sm max-h-48 overflow-y-auto">
+                        {vehiculosFiltrados.length === 0 ? (
+                          <p className="px-4 py-3 text-sm text-gray-400">No se encontraron vehículos con "{placaQuery}"</p>
+                        ) : (
+                          vehiculosFiltrados.map(v => (
+                            <button
+                              key={v.odoo_id}
+                              onClick={() => handleSelectPlaca(v)}
+                              className="w-full flex items-center justify-between px-4 py-3 text-sm hover:bg-red-50 border-b border-gray-100 last:border-0 text-left"
+                            >
+                              <span className="font-semibold text-red-700 font-mono">{v.placa}</span>
+                              <span className="text-gray-600 text-xs">{v.tipo_vehiculo}</span>
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-sm space-y-1">
+                    <div className="flex items-start justify-between">
+                      <p className="font-semibold text-gray-800">Vehículo seleccionado</p>
+                      <button onClick={limpiarPlaca} className="text-gray-500 hover:text-gray-700">
+                        <X size={16} />
+                      </button>
+                    </div>
+                    <p className="text-gray-700"><span className="font-medium">Placa:</span> <span className="font-mono">{form.placa}</span></p>
+                    <p className="text-gray-700"><span className="font-medium">Tipo:</span> {form.tipo_vehiculo}</p>
                   </div>
                 )}
               </div>
@@ -299,7 +450,7 @@ export default function SiniestroNuevo() {
           </>
         )}
 
-        {/* PASO 1 — Cliente */}
+        {/* ── PASO 1 — Cliente ── */}
         {step === 1 && (
           <>
             {esInterno && (
@@ -349,13 +500,13 @@ export default function SiniestroNuevo() {
           </>
         )}
 
-        {/* PASO 2 — Daño */}
+        {/* ── PASO 2 — Daño ── */}
         {step === 2 && (
           <>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Fecha del daño *</label>
-                <input type="date" value={form.fecha_dano} onChange={set('fecha_dano')} required
+                <input type="date" value={form.fecha_dano} onChange={set('fecha_dano')}
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-red-500" />
               </div>
               <div>
@@ -371,18 +522,14 @@ export default function SiniestroNuevo() {
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Tipo de daño *</label>
                 <select value={form.tipo_dano} onChange={set('tipo_dano')}
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-red-500">
-                  {TIPOS_DANO.map(t => (
-                    <option key={t.value} value={t.value}>{t.label}</option>
-                  ))}
+                  {TIPOS_DANO.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
                 </select>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Severidad *</label>
                 <select value={form.severidad} onChange={set('severidad')}
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-red-500">
-                  {SEVERIDADES.map(s => (
-                    <option key={s.value} value={s.value}>{s.label}</option>
-                  ))}
+                  {SEVERIDADES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
                 </select>
               </div>
             </div>
@@ -425,12 +572,7 @@ export default function SiniestroNuevo() {
             disabled={saving || !form.fecha_dano}
             className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            {saving ? 'Guardando...' : (
-              <>
-                <Check size={16} />
-                Registrar daño
-              </>
-            )}
+            {saving ? 'Guardando...' : <><Check size={16} />Registrar daño</>}
           </button>
         )}
       </div>
