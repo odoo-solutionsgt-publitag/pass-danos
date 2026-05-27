@@ -15,7 +15,7 @@ import { useAuth } from '../hooks/useAuth'
 
 const NAV_PRINCIPAL = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard },
-  { to: '/siniestros', label: 'Siniestros', icon: AlertTriangle },
+  { to: '/siniestros', label: 'Daños', icon: AlertTriangle },
   { to: '/servicios', label: 'Servicios', icon: Wrench },
   { to: '/proformas', label: 'Proformas', icon: FileText },
   { to: '/flota', label: 'Flota Vehicular', icon: Car },

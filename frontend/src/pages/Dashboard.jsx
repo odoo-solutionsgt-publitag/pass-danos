@@ -100,7 +100,7 @@ export default function Dashboard() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        <KpiCard title="Siniestros activos" value={kpis.activos} icon={AlertTriangle} color="bg-red-500" loading={loading} />
+        <KpiCard title="Daños activos" value={kpis.activos} icon={AlertTriangle} color="bg-red-500" loading={loading} />
         <KpiCard title="Proformas pendientes" value={kpis.proformasPendientes} icon={FileText} color="bg-amber-500" loading={loading} />
         <KpiCard title="Vehículos en reparación" value={kpis.enReparacion} icon={Car} color="bg-orange-500" loading={loading} />
         <KpiCard title="Servicios en curso" value={kpis.serviciosEnCurso} icon={Wrench} color="bg-blue-500" loading={loading} />
@@ -109,7 +109,7 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         <div className="xl:col-span-2 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-            <h2 className="font-semibold text-gray-900 text-sm">Últimos siniestros</h2>
+            <h2 className="font-semibold text-gray-900 text-sm">Últimos daños</h2>
             <button onClick={() => navigate('/siniestros')} className="text-red-600 text-xs font-medium hover:underline">
               Ver todos
             </button>
@@ -139,7 +139,7 @@ export default function Dashboard() {
                 ) : siniestros.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="px-5 py-8 text-center text-gray-400 text-sm">
-                      No hay siniestros registrados aún
+                      No hay daños registrados aún
                     </td>
                   </tr>
                 ) : (

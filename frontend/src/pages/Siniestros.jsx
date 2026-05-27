@@ -22,6 +22,18 @@ const SEVERIDAD_COLORS = {
   perdida_total: 'bg-red-900 text-red-100',
 }
 
+const ESTADO_LABELS = {
+  registrado: 'Registrado',
+  cotizando: 'Cotizando',
+  proforma_emitida: 'Proforma emitida',
+  proforma_aprobada: 'Proforma aprobada',
+  en_reparacion: 'En reparación',
+  reparado: 'Reparado',
+  en_cobro: 'En cobro',
+  cerrado: 'Cerrado',
+  anulado: 'Anulado',
+}
+
 const ESTADO_OPTIONS = [
   'registrado', 'cotizando', 'proforma_emitida', 'proforma_aprobada',
   'en_reparacion', 'reparado', 'en_cobro', 'cerrado', 'anulado',
@@ -77,7 +89,7 @@ export default function Siniestros() {
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Siniestros</h1>
+          <h1 className="text-xl font-bold text-gray-900">Daños</h1>
           <p className="text-sm text-gray-500">{filtrados.length} registros</p>
         </div>
         <button
@@ -85,7 +97,7 @@ export default function Siniestros() {
           className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
         >
           <Plus size={16} />
-          Registrar siniestro
+          Registrar daño
         </button>
       </div>
 
@@ -107,7 +119,7 @@ export default function Siniestros() {
         >
           <option value="">Todos los estados</option>
           {ESTADO_OPTIONS.map(e => (
-            <option key={e} value={e}>{e.replace(/_/g, ' ')}</option>
+            <option key={e} value={e}>{ESTADO_LABELS[e]}</option>
           ))}
         </select>
         <select
@@ -128,7 +140,7 @@ export default function Siniestros() {
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-100">
-                <th className="text-left px-5 py-3 text-xs text-gray-500 font-medium">No. Siniestro</th>
+                <th className="text-left px-5 py-3 text-xs text-gray-500 font-medium">No. Daño</th>
                 <th className="text-left px-5 py-3 text-xs text-gray-500 font-medium">Fecha</th>
                 <th className="text-left px-5 py-3 text-xs text-gray-500 font-medium">Vehículo</th>
                 <th className="text-left px-5 py-3 text-xs text-gray-500 font-medium">Cliente</th>
@@ -152,7 +164,7 @@ export default function Siniestros() {
               ) : filtrados.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="px-5 py-12 text-center text-gray-400">
-                    No se encontraron siniestros
+                    No se encontraron daños registrados
                   </td>
                 </tr>
               ) : (
@@ -175,7 +187,7 @@ export default function Siniestros() {
                     <td className="px-5 py-3.5 text-gray-700 whitespace-nowrap">{formatMonto(s.monto_cliente)}</td>
                     <td className="px-5 py-3.5">
                       <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${ESTADO_COLORS[s.estado]}`}>
-                        {s.estado?.replace(/_/g, ' ')}
+                        {ESTADO_LABELS[s.estado] ?? s.estado}
                       </span>
                     </td>
                   </tr>

@@ -351,6 +351,105 @@ app.patch('/vehiculo/:id/status', async (req, res) => {
 });
 
 // ============================================================
+// GET /contrato/:numero — Buscar contrato por RSV-XXXXX o CTO-XXXXX
+// ============================================================
+
+app.get('/contrato/:numero', async (req, res) => {
+  try {
+    const uid = await getUid();
+    const numero = req.params.numero.trim().toUpperCase();
+
+    const orders = await odooExecute(uid, 'sale.order', 'search_read', [
+      [
+        ['is_rental_order', '=', true],
+        '|',
+        ['name', '=', numero],
+        ['x_studio_numero_contrato', '=', numero],
+      ]
+    ], {
+      fields: ['id', 'name', 'partner_id', 'date_order', 'x_studio_numero_contrato', 'state', 'order_line'],
+      order: 'date_order desc',
+      limit: 1,
+    });
+
+    if (!orders.length) {
+      return res.status(404).json({ error: `No se encontró el contrato ${numero}` });
+    }
+
+    const order = orders[0];
+
+    // Datos del cliente
+    let cliente = { nombre: '', telefono: '', email: '', dpi: '' };
+    if (order.partner_id) {
+      try {
+        const partners = await odooExecute(uid, 'res.partner', 'read', [[order.partner_id[0]]], {
+          fields: ['phone', 'mobile', 'email', 'vat'],
+        });
+        if (partners.length) {
+          cliente = {
+            nombre: order.partner_id[1],
+            telefono: partners[0].phone || partners[0].mobile || '',
+            email: partners[0].email || '',
+            dpi: partners[0].vat || '',
+          };
+        }
+      } catch (err) {
+        console.warn('[GET /contrato] Error leyendo partner:', err.message);
+      }
+    }
+
+    // Vehículo desde las líneas del pedido
+    let vehiculo = null;
+    if (order.order_line && order.order_line.length) {
+      try {
+        const lines = await odooExecute(uid, 'sale.order.line', 'search_read', [
+          [['order_id', '=', order.id], ['product_template_id', '!=', false]]
+        ], {
+          fields: ['product_template_id'],
+          limit: 1,
+        });
+
+        if (lines.length && lines[0].product_template_id) {
+          const productId = lines[0].product_template_id[0];
+          const productos = await odooExecute(uid, 'product.template', 'read', [[productId]], {
+            fields: ['id', 'name', 'x_studio_placa_vehiculo_id', 'x_studio_tipo_de_vehiculo', 'x_studio_status_vehiculo'],
+          });
+          if (productos.length) {
+            const p = productos[0];
+            vehiculo = {
+              odoo_id: p.id,
+              nombre: p.name,
+              placa: p.x_studio_placa_vehiculo_id || '',
+              tipo_vehiculo: p.x_studio_tipo_de_vehiculo || '',
+              status: p.x_studio_status_vehiculo || '',
+            };
+          }
+        }
+      } catch (err) {
+        console.warn('[GET /contrato] Error leyendo líneas:', err.message);
+      }
+    }
+
+    console.log(`[GET /contrato/${numero}] → order ${order.id}, vehiculo: ${vehiculo?.placa ?? 'no encontrado'}`);
+
+    res.json({
+      contrato: {
+        odoo_id: order.id,
+        numero: order.name,
+        contrato_numero: order.x_studio_numero_contrato || order.name,
+        estado: order.state,
+        fecha_orden: order.date_order,
+      },
+      vehiculo,
+      cliente,
+    });
+  } catch (err) {
+    console.error('[GET /contrato/:numero]', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================================
 // GET /vehiculo/:id/fleet — Datos de flota (fleet.vehicle)
 // ============================================================
 
