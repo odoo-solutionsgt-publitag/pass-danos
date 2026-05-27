@@ -93,7 +93,7 @@ async function getVehiculoFromOrder(uid, orderId, orderLines) {
 
     const productId = lines[0].product_template_id[0];
     const productos = await odooExecute(uid, 'product.template', 'read', [[productId]], {
-      fields: ['id', 'name', 'x_studio_placa_vehiculo_id', 'x_studio_tipo_de_vehiculo', 'x_studio_status_vehiculo'],
+      fields: ['id', 'name', 'default_code', 'x_studio_tipo_de_vehiculo', 'x_studio_status_vehiculo'],
     });
 
     if (!productos.length) return null;
@@ -101,7 +101,7 @@ async function getVehiculoFromOrder(uid, orderId, orderLines) {
     return {
       odoo_id: p.id,
       nombre: p.name,
-      placa: p.x_studio_placa_vehiculo_id || '',
+      placa: p.default_code || '',
       tipo_vehiculo: p.x_studio_tipo_de_vehiculo || '',
       status: p.x_studio_status_vehiculo || '',
     };
@@ -182,18 +182,18 @@ app.get('/vehiculos', async (req, res) => {
     const uid = await getUid();
     const domain = [['rent_ok', '=', true]];
     if (req.query.status) domain.push(['x_studio_status_vehiculo', '=', req.query.status]);
-    if (req.query.placa) domain.push(['x_studio_placa_vehiculo_id', 'ilike', req.query.placa]);
+    if (req.query.placa) domain.push(['default_code', 'ilike', req.query.placa]);
 
     const vehiculos = await odooExecute(uid, 'product.template', 'search_read', [domain], {
-      fields: ['id', 'name', 'x_studio_placa_vehiculo_id', 'x_studio_tipo_de_vehiculo', 'x_studio_status_vehiculo', 'x_studio_tipo_de_servicio'],
-      order: 'x_studio_placa_vehiculo_id asc',
+      fields: ['id', 'name', 'default_code', 'x_studio_tipo_de_vehiculo', 'x_studio_status_vehiculo', 'x_studio_tipo_de_servicio'],
+      order: 'default_code asc',
       limit: parseInt(req.query.limit) || 200,
     });
 
     const result = vehiculos.map(v => ({
       odoo_id: v.id,
       nombre: v.name,
-      placa: v.x_studio_placa_vehiculo_id || '',
+      placa: v.default_code || '',
       tipo_vehiculo: v.x_studio_tipo_de_vehiculo || '',
       status: v.x_studio_status_vehiculo || '',
       tipo_servicio: v.x_studio_tipo_de_servicio || '',
@@ -216,9 +216,9 @@ app.get('/vehiculo/:placa', async (req, res) => {
     const placa = req.params.placa.toUpperCase();
 
     const vehiculos = await odooExecute(uid, 'product.template', 'search_read', [
-      [['x_studio_placa_vehiculo_id', '=', placa]]
+      [['default_code', '=', placa]]
     ], {
-      fields: ['id', 'name', 'x_studio_placa_vehiculo_id', 'x_studio_tipo_de_vehiculo', 'x_studio_status_vehiculo'],
+      fields: ['id', 'name', 'default_code', 'x_studio_tipo_de_vehiculo', 'x_studio_status_vehiculo'],
       limit: 1,
     });
 
@@ -266,7 +266,7 @@ app.get('/vehiculo/:placa', async (req, res) => {
       vehiculo: {
         odoo_id: vehiculo.id,
         nombre: vehiculo.name,
-        placa: vehiculo.x_studio_placa_vehiculo_id || '',
+        placa: vehiculo.default_code || '',
         tipo_vehiculo: vehiculo.x_studio_tipo_de_vehiculo || '',
         status: vehiculo.x_studio_status_vehiculo || '',
       },

@@ -235,7 +235,7 @@ export default function SiniestroNuevo() {
   // ── Validación por paso ────────────────────────────────────
 
   const canProceedStep0 = busquedaTipo === 'contrato'
-    ? (contratoSeleccionado !== null && form.placa !== '' && !cargandoDetalle)
+    ? (contratoSeleccionado !== null && !cargandoDetalle)
     : (placaSeleccionada !== null)
 
   // ── Submit ─────────────────────────────────────────────────
