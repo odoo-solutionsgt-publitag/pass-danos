@@ -147,21 +147,22 @@ CREATE INDEX idx_documentos_orden ON documentos(orden_servicio_id);
 -- ============================================================
 
 -- Número secuencial SRV-YYYY-NNN
+-- Variable v_anio (no `anio`) para evitar ambigüedad con la columna anio de ordenes_servicio
 CREATE OR REPLACE FUNCTION generar_numero_servicio()
 RETURNS TRIGGER AS $$
 DECLARE
-  anio TEXT;
-  seq INTEGER;
+  v_anio TEXT;
+  seq    INTEGER;
 BEGIN
-  anio := EXTRACT(YEAR FROM CURRENT_DATE)::TEXT;
+  v_anio := EXTRACT(YEAR FROM CURRENT_DATE)::TEXT;
   SELECT COALESCE(MAX(
     CAST(SPLIT_PART(numero, '-', 3) AS INTEGER)
   ), 0) + 1
   INTO seq
   FROM ordenes_servicio
-  WHERE numero LIKE 'SRV-' || anio || '-%';
+  WHERE numero LIKE 'SRV-' || v_anio || '-%';
 
-  NEW.numero := 'SRV-' || anio || '-' || LPAD(seq::TEXT, 3, '0');
+  NEW.numero := 'SRV-' || v_anio || '-' || LPAD(seq::TEXT, 3, '0');
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
