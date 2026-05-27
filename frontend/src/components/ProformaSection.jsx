@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import DocumentosSection from './DocumentosSection'
 
 const TIPO_LABELS = { repuesto: 'Repuesto', mano_obra: 'Mano de obra', otro: 'Otro' }
 
@@ -153,6 +154,18 @@ export default function ProformaSection({ siniestro, onUpdate }) {
             </p>
           </div>
         </div>
+      </div>
+
+      {/* Documentos asociados a la proforma */}
+      <div className="border-t border-gray-100 pt-4">
+        <DocumentosSection
+          origen="siniestro"
+          origenId={siniestro.id}
+          numero={`${siniestro.numero}-PROFORMA`}
+          cotizacionId={cotizacion.id}
+          tiposSugeridos={['proforma_pdf', 'factura', 'comprobante_pago', 'avaluo', 'otro']}
+          titulo="Documentos de la proforma"
+        />
       </div>
     </div>
   )

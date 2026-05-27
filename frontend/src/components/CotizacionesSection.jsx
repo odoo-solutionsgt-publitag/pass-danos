@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Plus, Trash2, Check } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import DocumentosSection from './DocumentosSection'
 
 const TIPO_LABELS = { repuesto: 'Repuesto', mano_obra: 'Mano de obra', otro: 'Otro' }
 
@@ -365,6 +366,15 @@ export default function CotizacionesSection({ siniestro, onUpdate }) {
                   <p className="text-xs text-gray-400 mt-1.5">Tip: presiona Enter en el precio para agregar rápido</p>
                 </div>
               )}
+
+              {/* Documentos de esta cotización */}
+              <div className="mt-4 -mx-4 -mb-4 px-4 py-3 bg-gray-50/50 border-t border-gray-100">
+                <DocumentosCotizacion
+                  siniestro={siniestro}
+                  cotizacionId={cot.id}
+                  tallerNombre={cot.talleres?.nombre}
+                />
+              </div>
             </div>
           </div>
         )
@@ -431,5 +441,19 @@ export default function CotizacionesSection({ siniestro, onUpdate }) {
         </div>
       )}
     </div>
+  )
+}
+
+// Wrapper para mostrar la sección de documentos específica a una cotización
+function DocumentosCotizacion({ siniestro, cotizacionId, tallerNombre }) {
+  return (
+    <DocumentosSection
+      origen="siniestro"
+      origenId={siniestro.id}
+      numero={`${siniestro.numero}-${(tallerNombre || 'COT').replace(/\s+/g, '_').toUpperCase()}`}
+      cotizacionId={cotizacionId}
+      tiposSugeridos={['cotizacion_pdf', 'otro']}
+      titulo={`Documentos del taller${tallerNombre ? ` — ${tallerNombre}` : ''}`}
+    />
   )
 }
