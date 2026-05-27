@@ -113,21 +113,22 @@ async function getVehiculoFromOrder(uid, orderId, orderLines) {
 
 // Helper: obtener datos de cliente desde res.partner
 async function getClienteFromPartner(uid, partnerId, partnerName) {
-  if (!partnerId) return { nombre: '', telefono: '', email: '', dpi: '' };
+  if (!partnerId) return { nombre: '', telefono: '', email: '', dpi: '', nit: '' };
   try {
     const partners = await odooExecute(uid, 'res.partner', 'read', [[partnerId]], {
-      fields: ['phone', 'mobile', 'email', 'vat'],
+      fields: ['phone', 'mobile', 'email', 'vat', 'x_studio_dpipasaporte_cliente'],
     });
-    if (!partners.length) return { nombre: partnerName || '', telefono: '', email: '', dpi: '' };
+    if (!partners.length) return { nombre: partnerName || '', telefono: '', email: '', dpi: '', nit: '' };
     return {
       nombre: partnerName || '',
       telefono: partners[0].phone || partners[0].mobile || '',
       email: partners[0].email || '',
-      dpi: partners[0].vat || '',
+      dpi: partners[0].x_studio_dpipasaporte_cliente || '',
+      nit: partners[0].vat || '',
     };
   } catch (err) {
     console.warn('[getClienteFromPartner] Error:', err.message);
-    return { nombre: partnerName || '', telefono: '', email: '', dpi: '' };
+    return { nombre: partnerName || '', telefono: '', email: '', dpi: '', nit: '' };
   }
 }
 

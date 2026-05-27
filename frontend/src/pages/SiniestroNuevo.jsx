@@ -60,6 +60,7 @@ export default function SiniestroNuevo() {
     contrato_numero: '',
     cliente_nombre: '',
     cliente_dpi: '',
+    cliente_nit: '',
     cliente_telefono: '',
     cliente_email: '',
     fecha_dano: new Date().toISOString().slice(0, 10),
@@ -102,6 +103,7 @@ export default function SiniestroNuevo() {
       contrato_numero: '',
       cliente_nombre: tipo === 'placa' ? 'Pass Rent a Car (Interno)' : '',
       cliente_dpi: '',
+      cliente_nit: '',
       cliente_telefono: '',
       cliente_email: '',
     }))
@@ -151,6 +153,7 @@ export default function SiniestroNuevo() {
         contrato_numero: data.contrato?.numero ?? '',
         cliente_nombre: data.cliente?.nombre ?? '',
         cliente_dpi: data.cliente?.dpi ?? '',
+        cliente_nit: data.cliente?.nit ?? '',
         cliente_telefono: data.cliente?.telefono ?? '',
         cliente_email: data.cliente?.email ?? '',
       }))
@@ -176,6 +179,7 @@ export default function SiniestroNuevo() {
       contrato_numero: '',
       cliente_nombre: '',
       cliente_dpi: '',
+      cliente_nit: '',
       cliente_telefono: '',
       cliente_email: '',
     }))
@@ -254,6 +258,7 @@ export default function SiniestroNuevo() {
         cliente_dpi: form.cliente_dpi,
         cliente_telefono: form.cliente_telefono,
         cliente_email: form.cliente_email,
+        cliente_nit: form.cliente_nit,
         fecha_dano: form.fecha_dano,
         lugar_accidente: form.lugar_accidente,
         tipo_dano: form.tipo_dano,
@@ -475,25 +480,34 @@ export default function SiniestroNuevo() {
 
             {!esInterno && (
               <>
+                <p className="text-xs text-gray-400 -mt-1">Datos sincronizados desde Odoo</p>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1.5">DPI / Pasaporte</label>
-                    <input value={form.cliente_dpi} onChange={set('cliente_dpi')}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-red-500"
-                      placeholder="1234 56789 0101" />
+                    <input value={form.cliente_dpi} readOnly
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-600 cursor-default"
+                      placeholder="—" />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Teléfono</label>
-                    <input value={form.cliente_telefono} onChange={set('cliente_telefono')}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-red-500"
-                      placeholder="5555-1234" />
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">NIT</label>
+                    <input value={form.cliente_nit} readOnly
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-600 cursor-default"
+                      placeholder="—" />
                   </div>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Correo electrónico</label>
-                  <input type="email" value={form.cliente_email} onChange={set('cliente_email')}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-red-500"
-                    placeholder="cliente@email.com" />
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Teléfono</label>
+                    <input value={form.cliente_telefono} readOnly
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-600 cursor-default"
+                      placeholder="—" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Correo electrónico</label>
+                    <input value={form.cliente_email} readOnly
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-600 cursor-default"
+                      placeholder="—" />
+                  </div>
                 </div>
               </>
             )}
