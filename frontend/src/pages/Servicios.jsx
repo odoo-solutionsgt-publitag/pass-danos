@@ -11,14 +11,32 @@ const ESTADO_COLORS = {
   cancelado: 'bg-red-100 text-red-700',
 }
 
+const TIPO_LABELS = {
+  servicio_menor:      'Serv. menor',
+  servicio_mayor:      'Serv. mayor',
+  cambio_llantas:      'Llantas',
+  cambio_bateria:      'Batería',
+  alineacion_balanceo: 'Alineación',
+  cambio_frenos:       'Frenos',
+  otro:                'Otro',
+}
+
 const TIPO_COLORS = {
-  servicio_menor: 'bg-green-100 text-green-700',
-  servicio_mayor: 'bg-amber-100 text-amber-700',
-  cambio_llantas: 'bg-blue-100 text-blue-700',
-  cambio_bateria: 'bg-blue-100 text-blue-700',
+  servicio_menor:      'bg-green-100 text-green-700',
+  servicio_mayor:      'bg-amber-100 text-amber-700',
+  cambio_llantas:      'bg-blue-100 text-blue-700',
+  cambio_bateria:      'bg-blue-100 text-blue-700',
   alineacion_balanceo: 'bg-gray-100 text-gray-700',
-  cambio_frenos: 'bg-amber-100 text-amber-700',
-  otro: 'bg-gray-100 text-gray-700',
+  cambio_frenos:       'bg-amber-100 text-amber-700',
+  otro:                'bg-gray-100 text-gray-700',
+}
+
+const ESTADO_LABELS = {
+  programado: 'Programado',
+  aprobado:   'Aprobado',
+  en_proceso: 'En proceso',
+  completado: 'Completado',
+  cancelado:  'Cancelado',
 }
 
 export default function Servicios() {
@@ -144,14 +162,14 @@ export default function Servicios() {
                     <td className="px-5 py-3.5 font-medium text-gray-900">{o.placa}</td>
                     <td className="px-5 py-3.5">
                       <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${TIPO_COLORS[o.tipo_servicio]}`}>
-                        {o.tipo_servicio?.replace(/_/g, ' ')}
+                        {TIPO_LABELS[o.tipo_servicio] ?? o.tipo_servicio}
                       </span>
                     </td>
                     <td className="px-5 py-3.5 text-gray-600">{o.talleres?.nombre || '—'}</td>
                     <td className="px-5 py-3.5 text-gray-700 whitespace-nowrap">{formatMonto(o.total_general)}</td>
                     <td className="px-5 py-3.5">
                       <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${ESTADO_COLORS[o.estado]}`}>
-                        {o.estado}
+                        {ESTADO_LABELS[o.estado] ?? o.estado}
                       </span>
                     </td>
                   </tr>
