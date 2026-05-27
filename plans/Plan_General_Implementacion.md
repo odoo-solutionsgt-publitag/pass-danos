@@ -419,14 +419,14 @@ Estos componentes se necesitan en múltiples módulos. Conviene crearlos bien de
 |---------|--------|
 | `plans/Implementar_backend_frontend.md` | ✅ Creado — Sesión 1 |
 | `plans/Plan_General_Implementacion.md` | ✅ Este documento |
-| `plans/Plan_00_Entorno.md` | ⬜ Por crear |
-| `plans/Plan_01_Dashboard.md` | ⬜ Por crear |
-| `plans/Plan_02_Siniestros_Lista_Nuevo.md` | ⬜ Por crear |
-| `plans/Plan_03_Siniestro_Detalle.md` | ⬜ Por crear |
-| `plans/Plan_04_Cotizaciones_Proforma.md` | ⬜ Por crear |
-| `plans/Plan_05_Cobros.md` | ⬜ Por crear |
-| `plans/Plan_06_Servicios_Mantenimiento.md` | ⬜ Por crear |
-| `plans/Plan_07_Flota_Vehicular.md` | ⬜ Por crear |
-| `plans/Plan_08_Catalogos.md` | ⬜ Por crear |
-| `plans/Plan_09_Repositorio.md` | ⬜ Por crear |
-| `plans/Plan_10_Reportes.md` | ⬜ Por crear |
+| `plans/Plan_00_Entorno.md` | ✅ Implementado |
+| `plans/Plan_01_Dashboard.md` | ✅ Implementado |
+| `plans/Plan_02_Siniestros_Lista_Nuevo.md` | ✅ Implementado |
+| `plans/Plan_03_Siniestro_Detalle.md` | ✅ Implementado |
+| `plans/Plan_04_Cotizaciones_Proforma.md` | ✅ Implementado |
+| `plans/Plan_05_Cobros.md` | ⏭️ Omitido — se gestiona en Odoo |
+| `plans/Plan_06_Servicios_Mantenimiento.md` | ✅ Implementado |
+| `plans/Plan_07_Flota_Vehicular.md` | ✅ Implementado |
+| `plans/Plan_08_Catalogos.md` | ✅ Implementado |
+| `plans/Plan_09_Repositorio.md` | ✅ Implementado |
+| `plans/Plan_10_Reportes.md` | ✅ Implementado |
