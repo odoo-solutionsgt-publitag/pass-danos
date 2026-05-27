@@ -7,6 +7,8 @@ import {
 import { supabase } from '../lib/supabase'
 import { updateVehiculoStatus } from '../lib/odoo-api'
 import { useAuth } from '../hooks/useAuth'
+import CotizacionesSection from '../components/CotizacionesSection'
+import ProformaSection from '../components/ProformaSection'
 
 // ── Labels y colores ──────────────────────────────────────────
 
@@ -486,6 +488,20 @@ export default function SiniestroDetalle() {
             <p className="text-sm text-gray-600 border-t border-gray-50 pt-3">{siniestro.descripcion}</p>
           )}
         </div>
+
+        {/* ── Cotizaciones (visible solo cuando estado=cotizando) ── */}
+        {estado === 'cotizando' && (
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+            <CotizacionesSection siniestro={siniestro} onUpdate={loadAll} />
+          </div>
+        )}
+
+        {/* ── Proforma (visible desde proforma_emitida en adelante) ── */}
+        {['proforma_emitida', 'proforma_aprobada', 'en_reparacion', 'reparado', 'en_cobro', 'cerrado'].includes(estado) && (
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+            <ProformaSection siniestro={siniestro} onUpdate={loadAll} />
+          </div>
+        )}
 
         {/* ── Taller ──────────────────────────────────────────── */}
         {tallerIngresos.length > 0 && (
