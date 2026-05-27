@@ -9,6 +9,7 @@ import { updateVehiculoStatus } from '../lib/odoo-api'
 import { useAuth } from '../hooks/useAuth'
 import CotizacionesSection from '../components/CotizacionesSection'
 import ProformaSection from '../components/ProformaSection'
+import DocumentosSection from '../components/DocumentosSection'
 
 // ── Labels y colores ──────────────────────────────────────────
 
@@ -551,6 +552,14 @@ export default function SiniestroDetalle() {
             </p>
           </div>
         )}
+
+        {/* ── Documentos ──────────────────────────────────────── */}
+        <DocumentosSection
+          origen="siniestro"
+          origenId={siniestro.id}
+          numero={siniestro.numero}
+          tiposSugeridos={['cotizacion_pdf', 'proforma_pdf', 'foto_dano', 'factura', 'comprobante_pago', 'avaluo', 'otro']}
+        />
 
         {/* ── Historial ───────────────────────────────────────── */}
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">

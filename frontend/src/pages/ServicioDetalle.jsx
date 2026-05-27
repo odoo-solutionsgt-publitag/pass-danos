@@ -7,6 +7,7 @@ import {
 import { supabase } from '../lib/supabase'
 import { updateVehiculoStatus } from '../lib/odoo-api'
 import { useAuth } from '../hooks/useAuth'
+import DocumentosSection from '../components/DocumentosSection'
 
 // ── Constantes ────────────────────────────────────────────────
 
@@ -557,6 +558,14 @@ export default function ServicioDetalle() {
             </p>
           </div>
         )}
+
+        {/* ── Documentos ──────────────────────────────────────── */}
+        <DocumentosSection
+          origen="servicio"
+          origenId={orden.id}
+          numero={orden.numero}
+          tiposSugeridos={['cotizacion_pdf', 'factura', 'comprobante_pago', 'otro']}
+        />
 
         {/* ── Timeline ─────────────────────────────────────── */}
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
