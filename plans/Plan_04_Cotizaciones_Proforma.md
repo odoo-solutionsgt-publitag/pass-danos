@@ -14,7 +14,8 @@ Permitir solicitar 1-3 cotizaciones a talleres del catálogo, capturar líneas d
 ## Archivos
 
 - [frontend/src/components/CotizacionesSection.jsx](../frontend/src/components/CotizacionesSection.jsx)
-- [frontend/src/components/ProformaSection.jsx](../frontend/src/components/ProformaSection.jsx)
+- [frontend/src/components/ProformaSection.jsx](../frontend/src/components/ProformaSection.jsx) — embebida en `SiniestroDetalle`
+- [frontend/src/pages/Proformas.jsx](../frontend/src/pages/Proformas.jsx) — vista global de proformas (lista)
 - Embebidos en [SiniestroDetalle.jsx](../frontend/src/pages/SiniestroDetalle.jsx)
 
 ---
@@ -65,6 +66,28 @@ Al editar `monto_cliente` se guarda en el siniestro junto con `margen = monto_cl
 
 ### Imprimir
 Botón "Imprimir / PDF" usa `window.print()`. CSS print-friendly (oculta sidebar/header en `@media print`).
+
+---
+
+## Vista global `/proformas` (Proformas.jsx)
+
+Lista todas las cotizaciones aprobadas del sistema con join a `siniestros`.
+
+### Columnas
+Daño, Vehículo (placa + marca/línea), Cliente, Taller, Costo Pass, Cliente paga, Margen (verde/rojo), Estado del siniestro.
+
+### KPIs en header
+- Costo Pass total
+- Cliente paga total
+- Margen acumulado (verde si ≥0, rojo si <0)
+
+### Filtros
+- Búsqueda libre (número / placa / cliente / taller)
+- Filtro por estado del siniestro
+
+### Acciones
+- Click en fila → navega al detalle del daño (donde está el ProformaSection con imprimir)
+- Export CSV con BOM UTF-8
 
 ---
 
