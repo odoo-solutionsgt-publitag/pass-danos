@@ -16,6 +16,7 @@ import Repositorio from './pages/Repositorio'
 import Reportes from './pages/Reportes'
 import FichaSiniestroPrint from './pages/FichaSiniestroPrint'
 import FichaServicioPrint from './pages/FichaServicioPrint'
+import BitacoraVehiculo from './pages/BitacoraVehiculo'
 
 export default function App() {
   return (
@@ -45,6 +46,7 @@ export default function App() {
           <Route path="servicios/:id" element={<ServicioDetalle />} />
           <Route path="proformas" element={<Proformas />} />
           <Route path="flota" element={<FlotaVehicular />} />
+          <Route path="bitacora/:placa" element={<BitacoraVehiculo />} />
           <Route path="catalogos" element={<Catalogos />} />
           <Route path="repositorio" element={<Repositorio />} />
           <Route path="reportes" element={<Reportes />} />

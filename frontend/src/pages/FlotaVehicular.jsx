@@ -417,19 +417,27 @@ function VehiculoDrawer({ vehiculo, onClose }) {
             )}
           </div>
 
-          <div className="pt-3 border-t border-gray-100 grid grid-cols-2 gap-2">
+          <div className="pt-3 border-t border-gray-100 space-y-2">
             <button
-              onClick={() => { onClose(); navigate('/siniestros/nuevo', { state: { placa: vehiculo.placa } }) }}
-              className="text-sm bg-red-600 hover:bg-red-700 text-white font-medium py-2 rounded-lg"
+              onClick={() => { onClose(); navigate(`/bitacora/${vehiculo.placa}`) }}
+              className="w-full text-sm bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 rounded-lg flex items-center justify-center gap-2"
             >
-              + Daño
+              <FileText size={14} /> Ver bitácora completa
             </button>
-            <button
-              onClick={() => { onClose(); navigate('/servicios/nuevo', { state: { placa: vehiculo.placa } }) }}
-              className="text-sm bg-gray-900 hover:bg-gray-800 text-white font-medium py-2 rounded-lg"
-            >
-              + Servicio
-            </button>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => { onClose(); navigate('/siniestros/nuevo', { state: { placa: vehiculo.placa } }) }}
+                className="text-sm bg-red-600 hover:bg-red-700 text-white font-medium py-2 rounded-lg"
+              >
+                + Daño
+              </button>
+              <button
+                onClick={() => { onClose(); navigate('/servicios/nuevo', { state: { placa: vehiculo.placa } }) }}
+                className="text-sm bg-gray-900 hover:bg-gray-800 text-white font-medium py-2 rounded-lg"
+              >
+                + Servicio
+              </button>
+            </div>
           </div>
         </div>
       </div>
