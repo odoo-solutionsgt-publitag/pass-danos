@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="0">
+
+    <!--
+        Acción URL: abre la app externa de Gestión de Daños / Mantenimiento
+        en una nueva pestaña del navegador.
+    -->
+    <record id="action_gestion_danos_url" model="ir.actions.act_url">
+        <field name="name">Gestión de Daños / Mantenimiento</field>
+        <field name="url">https://gestion-danos.odoo-server.online</field>
+        <field name="target">new</field>
+    </record>
+
+</odoo>

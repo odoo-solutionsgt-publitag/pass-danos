@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        Extiende la ficha del usuario (res.users) para agregar el checkbox
+        que controla el acceso a la app Gestión de Daños.
+    -->
+    <record id="view_users_form_inherit_danos" model="ir.ui.view">
+        <field name="name">res.users.form.inherit.pass.gestion.danos</field>
+        <field name="model">res.users</field>
+        <field name="inherit_id" ref="base.view_users_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//notebook" position="inside">
+                <page string="Pass — Apps Externas" name="pass_apps">
+                    <group>
+                        <group string="Gestión de Daños / Mantenimiento">
+                            <field name="x_can_access_danos"/>
+                        </group>
+                    </group>
+                    <div class="alert alert-info" role="alert" style="margin-top: 10px;">
+                        <strong>Nota:</strong> al marcar este campo, el usuario podrá iniciar
+                        sesión en
+                        <a href="https://gestion-danos.odoo-server.online" target="_blank">
+                            gestion-danos.odoo-server.online
+                        </a>
+                        usando sus mismas credenciales de Odoo. El rol dentro de la app
+                        (agente / agente_senior / admin / readonly) se asigna desde la propia app.
+                    </div>
+                </page>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>

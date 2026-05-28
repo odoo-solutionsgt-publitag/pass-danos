@@ -1,6 +1,8 @@
 const express = require('express');
 const cors = require('cors');
 const xmlrpc = require('xmlrpc');
+const jwt = require('jsonwebtoken');
+const { v5: uuidv5 } = require('uuid');
 const { createClient } = require('@supabase/supabase-js');
 
 // ============================================================
@@ -19,6 +21,8 @@ const ODOO = {
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
+const SUPABASE_JWT_SECRET = process.env.SUPABASE_JWT_SECRET;
+const ODOO_DANOS_NAMESPACE_UUID = process.env.ODOO_DANOS_NAMESPACE_UUID;
 const CORS_ORIGIN = process.env.CORS_ORIGIN || 'https://gestion-danos.odoo-server.online';
 
 // ============================================================
@@ -50,6 +54,18 @@ function odooAuthenticate() {
       if (err) return reject(err);
       if (!uid) return reject(new Error('Odoo auth failed: invalid credentials'));
       resolve(uid);
+    });
+  });
+}
+
+// Autentica con credenciales arbitrarias (NO el API user) — para SSO de usuarios finales.
+// Retorna el uid de Odoo si las credenciales son válidas, o null si no lo son.
+function odooAuthenticateAs(login, password) {
+  return new Promise((resolve, reject) => {
+    const client = getOdooClient('/xmlrpc/2/common');
+    client.methodCall('authenticate', [ODOO.db, login, password, {}], (err, uid) => {
+      if (err) return reject(err);
+      resolve(uid || null);
     });
   });
 }
@@ -208,6 +224,131 @@ app.get('/health', async (req, res) => {
   }
   res.json(status);
 });
+
+// ============================================================
+// POST /auth/odoo — SSO: autentica con credenciales Odoo y devuelve
+// un JWT compatible con Supabase para el frontend.
+// ============================================================
+
+app.post('/auth/odoo', async (req, res) => {
+  const { login, password } = req.body || {};
+  if (!login || !password) {
+    return res.status(400).json({ error: 'Correo y contraseña requeridos' });
+  }
+  if (!supabase) {
+    return res.status(500).json({ error: 'Supabase no configurado en backend' });
+  }
+  if (!SUPABASE_JWT_SECRET || !ODOO_DANOS_NAMESPACE_UUID) {
+    return res.status(500).json({ error: 'SSO no configurado (faltan SUPABASE_JWT_SECRET o ODOO_DANOS_NAMESPACE_UUID)' });
+  }
+
+  try {
+    // 1. Autenticar las credenciales contra Odoo
+    const userUid = await odooAuthenticateAs(login.trim(), password);
+    if (!userUid) {
+      return res.status(401).json({ error: 'Credenciales incorrectas en Odoo' });
+    }
+
+    // 2. Leer el res.users con el API user (con permisos completos para read)
+    const adminUid = await getUid();
+    const users = await odooExecute(adminUid, 'res.users', 'read', [[userUid]], {
+      fields: ['name', 'login', 'email', 'x_can_access_danos', 'active'],
+    });
+    if (!users.length) {
+      return res.status(403).json({ error: 'Usuario no encontrado en Odoo' });
+    }
+    const u = users[0];
+    if (!u.active) {
+      return res.status(403).json({ error: 'Usuario desactivado en Odoo' });
+    }
+    if (!u.x_can_access_danos) {
+      return res.status(403).json({ error: 'No tiene permiso para acceder a Gestión de Daños. Solicite al administrador habilitar el acceso en su ficha de usuario de Odoo.' });
+    }
+
+    const userEmail = u.email || u.login;
+
+    // 3. Calcular UUID determinístico para auth.users
+    const userId = uuidv5(`odoo:${userUid}`, ODOO_DANOS_NAMESPACE_UUID);
+
+    // 4. Crear / actualizar usuario en auth.users y perfiles
+    await ensureSupabaseUser({ userId, email: userEmail, nombre: u.name });
+
+    // 5. Firmar JWT compatible con Supabase
+    const now = Math.floor(Date.now() / 1000);
+    const expSec = now + 3600; // 1 hora
+    const accessToken = jwt.sign({
+      iss: 'supabase',
+      sub: userId,
+      aud: 'authenticated',
+      role: 'authenticated',
+      iat: now,
+      exp: expSec,
+      email: userEmail,
+      user_metadata: {
+        nombre: u.name,
+        odoo_uid: userUid,
+      },
+      app_metadata: { provider: 'odoo' },
+    }, SUPABASE_JWT_SECRET, { algorithm: 'HS256' });
+
+    console.log(`[POST /auth/odoo] OK — ${u.login} (Odoo uid=${userUid})`);
+
+    res.json({
+      access_token: accessToken,
+      refresh_token: accessToken, // sin refresh real — el TTL fuerza re-login
+      token_type: 'bearer',
+      expires_in: 3600,
+      expires_at: expSec,
+      user: {
+        id: userId,
+        email: userEmail,
+        nombre: u.name,
+        odoo_uid: userUid,
+      },
+    });
+  } catch (err) {
+    console.error('[POST /auth/odoo]', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+async function ensureSupabaseUser({ userId, email, nombre }) {
+  // 1. Asegurar fila en auth.users
+  const { data: existing } = await supabase.auth.admin.getUserById(userId);
+  if (!existing?.user) {
+    await supabase.auth.admin.createUser({
+      id: userId,
+      email,
+      email_confirm: true,
+      user_metadata: { nombre, provider: 'odoo' },
+    });
+    console.log(`[ensureSupabaseUser] Created auth.users ${userId} (${email})`);
+  } else {
+    // Actualiza email/nombre si cambiaron en Odoo
+    const currentEmail = existing.user.email;
+    const currentNombre = existing.user.user_metadata?.nombre;
+    if (currentEmail !== email || currentNombre !== nombre) {
+      await supabase.auth.admin.updateUserById(userId, {
+        email,
+        user_metadata: { nombre, provider: 'odoo' },
+      });
+    }
+  }
+
+  // 2. Asegurar fila en perfiles
+  const { data: perfil } = await supabase.from('perfiles').select('id, rol, activo').eq('id', userId).maybeSingle();
+  if (!perfil) {
+    await supabase.from('perfiles').insert({
+      id: userId,
+      nombre_completo: nombre,
+      rol: 'agente',
+      activo: true,
+    });
+    console.log(`[ensureSupabaseUser] Created perfiles row for ${userId}`);
+  } else if (!perfil.activo) {
+    throw new Error('Perfil desactivado en la app. Contacte al administrador.');
+  }
+}
 
 // ============================================================
 // GET /vehiculos — Lista de vehículos desde Odoo

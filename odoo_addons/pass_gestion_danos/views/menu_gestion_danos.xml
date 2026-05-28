@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        Menú "Gestión de Daños/Mant" dentro del módulo Rental (Reservaciones).
+        Se ubica debajo del menú "Flotilla Vehicular" usando sequence=50.
+    -->
+    <menuitem
+        id="menu_gestion_danos_external"
+        name="Gestión de Daños/Mant"
+        parent="sale_renting.rental_menu_root"
+        action="action_gestion_danos_url"
+        sequence="50"
+        groups="base.group_user"/>
+
+</odoo>

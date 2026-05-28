@@ -1,10 +1,16 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { Shield, KeyRound } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
+import { supabase } from '../lib/supabase'
+
+const API_URL = import.meta.env.VITE_API_URL
 
 export default function Login() {
   const { signIn, user } = useAuth()
   const navigate = useNavigate()
+
+  const [tab, setTab] = useState('odoo')  // 'odoo' | 'admin'
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -15,19 +21,48 @@ export default function Login() {
     return null
   }
 
-  async function handleSubmit(e) {
+  async function handleOdooLogin(e) {
+    e.preventDefault()
+    setError('')
+    setLoading(true)
+    try {
+      const res = await fetch(`${API_URL}/auth/odoo`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ login: email, password }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Error de autenticación')
+
+      const { error: setErr } = await supabase.auth.setSession({
+        access_token: data.access_token,
+        refresh_token: data.refresh_token,
+      })
+      if (setErr) throw setErr
+
+      navigate('/')
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleAdminLogin(e) {
     e.preventDefault()
     setError('')
     setLoading(true)
     try {
       await signIn(email, password)
       navigate('/')
-    } catch (err) {
+    } catch {
       setError('Credenciales incorrectas. Verifique su correo y contraseña.')
     } finally {
       setLoading(false)
     }
   }
+
+  const handleSubmit = tab === 'odoo' ? handleOdooLogin : handleAdminLogin
 
   return (
     <div className="min-h-screen bg-gray-900 flex items-center justify-center px-4">
@@ -47,51 +82,83 @@ export default function Login() {
           <p className="text-gray-400 text-sm mt-1">Gestión de Daños y Servicios</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="bg-gray-800 rounded-2xl p-8 space-y-5">
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1.5">
-              Correo electrónico
-            </label>
-            <input
-              type="email"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              required
-              autoComplete="email"
-              className="w-full bg-gray-700 text-white rounded-lg px-4 py-2.5 text-sm border border-gray-600 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500"
-              placeholder="usuario@passrentacar.com"
-            />
+        <div className="bg-gray-800 rounded-2xl p-8">
+          {/* Tabs */}
+          <div className="flex gap-1 bg-gray-700/50 rounded-lg p-1 mb-5">
+            <button
+              type="button"
+              onClick={() => { setTab('odoo'); setError('') }}
+              className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm font-medium rounded-md transition-colors ${
+                tab === 'odoo' ? 'bg-red-600 text-white' : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              <KeyRound size={14} />
+              Usuario Odoo
+            </button>
+            <button
+              type="button"
+              onClick={() => { setTab('admin'); setError('') }}
+              className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm font-medium rounded-md transition-colors ${
+                tab === 'admin' ? 'bg-red-600 text-white' : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              <Shield size={14} />
+              Admin
+            </button>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1.5">
-              Contraseña
-            </label>
-            <input
-              type="password"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              required
-              autoComplete="current-password"
-              className="w-full bg-gray-700 text-white rounded-lg px-4 py-2.5 text-sm border border-gray-600 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500"
-              placeholder="••••••••"
-            />
-          </div>
-
-          {error && (
-            <div className="bg-red-900/40 border border-red-700 text-red-300 text-sm px-4 py-3 rounded-lg">
-              {error}
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1.5">
+                Correo electrónico
+              </label>
+              <input
+                type="email"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                required
+                autoComplete="email"
+                className="w-full bg-gray-700 text-white rounded-lg px-4 py-2.5 text-sm border border-gray-600 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500"
+                placeholder={tab === 'odoo' ? 'usuario@passrentacar.com' : 'admin@passrentacar.com'}
+              />
             </div>
-          )}
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-red-600 hover:bg-red-700 disabled:opacity-60 disabled:cursor-not-allowed text-white font-medium py-2.5 rounded-lg transition-colors text-sm"
-          >
-            {loading ? 'Ingresando...' : 'Ingresar'}
-          </button>
-        </form>
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1.5">
+                Contraseña
+              </label>
+              <input
+                type="password"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                required
+                autoComplete="current-password"
+                className="w-full bg-gray-700 text-white rounded-lg px-4 py-2.5 text-sm border border-gray-600 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500"
+                placeholder="••••••••"
+              />
+            </div>
+
+            {error && (
+              <div className="bg-red-900/40 border border-red-700 text-red-300 text-sm px-4 py-3 rounded-lg">
+                {error}
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-red-600 hover:bg-red-700 disabled:opacity-60 disabled:cursor-not-allowed text-white font-medium py-2.5 rounded-lg transition-colors text-sm"
+            >
+              {loading ? 'Ingresando...' : 'Ingresar'}
+            </button>
+          </form>
+
+          <p className="text-xs text-gray-500 mt-4 text-center">
+            {tab === 'odoo'
+              ? 'Use sus credenciales de Odoo. El acceso debe estar habilitado por el administrador.'
+              : 'Solo para el administrador de la app.'}
+          </p>
+        </div>
       </div>
     </div>
   )
