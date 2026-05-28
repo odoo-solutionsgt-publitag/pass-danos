@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Search } from 'lucide-react'
+import { Plus, Search, Printer } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 
 const ESTADO_COLORS = {
@@ -148,13 +148,14 @@ export default function Siniestros() {
                 <th className="text-left px-5 py-3 text-xs text-gray-500 font-medium">Severidad</th>
                 <th className="text-left px-5 py-3 text-xs text-gray-500 font-medium">Total Q.</th>
                 <th className="text-left px-5 py-3 text-xs text-gray-500 font-medium">Estado</th>
+                <th className="px-5 py-3 w-12" />
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
               {loading ? (
                 Array.from({ length: 6 }).map((_, i) => (
                   <tr key={i}>
-                    {Array.from({ length: 8 }).map((_, j) => (
+                    {Array.from({ length: 9 }).map((_, j) => (
                       <td key={j} className="px-5 py-3.5">
                         <div className="h-3.5 bg-gray-100 rounded animate-pulse w-20" />
                       </td>
@@ -163,7 +164,7 @@ export default function Siniestros() {
                 ))
               ) : filtrados.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-5 py-12 text-center text-gray-400">
+                  <td colSpan={9} className="px-5 py-12 text-center text-gray-400">
                     No se encontraron daños registrados
                   </td>
                 </tr>
@@ -189,6 +190,15 @@ export default function Siniestros() {
                       <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${ESTADO_COLORS[s.estado]}`}>
                         {ESTADO_LABELS[s.estado] ?? s.estado}
                       </span>
+                    </td>
+                    <td className="px-5 py-3.5">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); window.open(`/siniestros/${s.id}/imprimir`, '_blank') }}
+                        className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded"
+                        title="Imprimir ficha"
+                      >
+                        <Printer size={15} />
+                      </button>
                     </td>
                   </tr>
                 ))

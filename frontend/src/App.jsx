@@ -14,12 +14,20 @@ import FlotaVehicular from './pages/FlotaVehicular'
 import Catalogos from './pages/Catalogos'
 import Repositorio from './pages/Repositorio'
 import Reportes from './pages/Reportes'
+import FichaSiniestroPrint from './pages/FichaSiniestroPrint'
+import FichaServicioPrint from './pages/FichaServicioPrint'
 
 export default function App() {
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<Login />} />
+        <Route path="/siniestros/:id/imprimir" element={
+          <ProtectedRoute><FichaSiniestroPrint /></ProtectedRoute>
+        } />
+        <Route path="/servicios/:id/imprimir" element={
+          <ProtectedRoute><FichaServicioPrint /></ProtectedRoute>
+        } />
         <Route
           path="/"
           element={

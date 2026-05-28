@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, AlertTriangle, CheckCircle2, Clock, Wrench,
-  Plus, Trash2, ChevronRight, X,
+  Plus, Trash2, ChevronRight, X, Printer,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { updateVehiculoStatus } from '../lib/odoo-api'
@@ -359,6 +359,15 @@ export default function ServicioDetalle() {
                 Completar servicio
               </button>
             )}
+
+            <button
+              onClick={() => window.open(`/servicios/${orden.id}/imprimir`, '_blank')}
+              className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 text-gray-600 hover:bg-gray-50 text-sm rounded-lg"
+              title="Imprimir ficha"
+            >
+              <Printer size={14} />
+              Imprimir
+            </button>
 
             {/* Cancelar — admin, estados activos */}
             {esAdmin && !bloqueada && (

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, AlertTriangle, CheckCircle2, Clock, Wrench,
-  Car, User, FileText, X, ChevronRight,
+  Car, User, FileText, X, ChevronRight, Printer,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { updateVehiculoStatus } from '../lib/odoo-api'
@@ -401,6 +401,15 @@ export default function SiniestroDetalle() {
                 Cerrar expediente
               </button>
             )}
+
+            <button
+              onClick={() => window.open(`/siniestros/${siniestro.id}/imprimir`, '_blank')}
+              className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 text-gray-600 hover:bg-gray-50 text-sm rounded-lg"
+              title="Imprimir ficha"
+            >
+              <Printer size={14} />
+              Imprimir
+            </button>
 
             {/* Anular — solo admin/agente_senior, en estados activos */}
             {esAdminOSenior && !['cerrado', 'anulado'].includes(estado) && (
