@@ -181,12 +181,15 @@ app.get('/health', async (req, res) => {
 app.get('/vehiculos', async (req, res) => {
   try {
     const uid = await getUid();
-    const domain = [['rent_ok', '=', true]];
+    const domain = [
+      ['rent_ok', '=', true],
+      ['categ_id', '=', 2],
+    ];
     if (req.query.status) domain.push(['x_studio_status_vehiculo', '=', req.query.status]);
     if (req.query.placa) domain.push(['default_code', 'ilike', req.query.placa]);
 
     const vehiculos = await odooExecute(uid, 'product.template', 'search_read', [domain], {
-      fields: ['id', 'name', 'default_code', 'x_studio_tipo_de_vehiculo', 'x_studio_status_vehiculo', 'x_studio_tipo_de_servicio'],
+      fields: ['id', 'name', 'default_code', 'x_studio_tipo_de_vehiculo', 'x_studio_status_vehiculo', 'x_studio_tipo_de_servicio', 'categ_id'],
       order: 'default_code asc',
       limit: parseInt(req.query.limit) || 200,
     });

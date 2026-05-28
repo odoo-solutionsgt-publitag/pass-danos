@@ -22,6 +22,19 @@ const STATUS_ORDER = [
 
 const KPI_STATUSES = ['Disponible', 'Rentado', 'En Reparación', 'En Mantenimiento']
 
+const TIPO_VEHICULO_ORDER = ['Económico', 'Sedán', 'Pickup', 'SUV/Camioneta', 'Microbus', 'Camión', 'Cotización', 'N/A']
+
+const TIPO_VEHICULO_COLORS = {
+  'Económico':     { badge: 'bg-emerald-100 text-emerald-700 border-emerald-200', dot: 'bg-emerald-500' },
+  'Sedán':         { badge: 'bg-sky-100 text-sky-700 border-sky-200',             dot: 'bg-sky-500'     },
+  'Pickup':        { badge: 'bg-orange-100 text-orange-700 border-orange-200',    dot: 'bg-orange-500'  },
+  'SUV/Camioneta': { badge: 'bg-purple-100 text-purple-700 border-purple-200',    dot: 'bg-purple-500'  },
+  'Microbus':      { badge: 'bg-pink-100 text-pink-700 border-pink-200',          dot: 'bg-pink-500'    },
+  'Camión':        { badge: 'bg-amber-100 text-amber-700 border-amber-200',       dot: 'bg-amber-500'   },
+  'Cotización':    { badge: 'bg-indigo-100 text-indigo-700 border-indigo-200',    dot: 'bg-indigo-500'  },
+  'N/A':           { badge: 'bg-gray-100 text-gray-500 border-gray-200',          dot: 'bg-gray-300'    },
+}
+
 export default function FlotaVehicular() {
   const [vehiculos, setVehiculos] = useState([])
   const [loading, setLoading]     = useState(true)
@@ -29,6 +42,7 @@ export default function FlotaVehicular() {
 
   const [busqueda, setBusqueda]     = useState('')
   const [filtroTipo, setFiltroTipo] = useState('')
+  const [vistaPor, setVistaPor]     = useState('estado')  // 'estado' | 'tipo'
 
   const [seleccionado, setSeleccionado] = useState(null)
 
@@ -58,14 +72,18 @@ export default function FlotaVehicular() {
     return true
   })
 
-  const porStatus = STATUS_ORDER.reduce((acc, status) => {
-    const grupo = vehiculosFiltrados.filter(v => v.status === status)
-    if (grupo.length > 0) acc[status] = grupo
+  const agrupadoPor = vistaPor === 'tipo' ? 'tipo_vehiculo' : 'status'
+  const ordenGrupos = vistaPor === 'tipo' ? TIPO_VEHICULO_ORDER : STATUS_ORDER
+  const coloresGrupos = vistaPor === 'tipo' ? TIPO_VEHICULO_COLORS : STATUS_COLORS
+
+  const porGrupo = ordenGrupos.reduce((acc, key) => {
+    const grupo = vehiculosFiltrados.filter(v => v[agrupadoPor] === key)
+    if (grupo.length > 0) acc[key] = grupo
     return acc
   }, {})
 
-  const sinStatus = vehiculosFiltrados.filter(v => !v.status || !STATUS_ORDER.includes(v.status))
-  if (sinStatus.length > 0) porStatus['Sin estado'] = sinStatus
+  const sinClasificar = vehiculosFiltrados.filter(v => !v[agrupadoPor] || !ordenGrupos.includes(v[agrupadoPor]))
+  if (sinClasificar.length > 0) porGrupo[vistaPor === 'tipo' ? 'Sin tipo' : 'Sin estado'] = sinClasificar
 
   const contadores = STATUS_ORDER.reduce((acc, s) => {
     acc[s] = vehiculos.filter(v => v.status === s).length
@@ -109,7 +127,7 @@ export default function FlotaVehicular() {
       </div>
 
       {/* Filtros */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 flex flex-wrap gap-3">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 flex flex-wrap gap-3 items-center">
         <div className="flex-1 min-w-[200px] relative">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
@@ -128,6 +146,26 @@ export default function FlotaVehicular() {
           <option value="">Todos los tipos</option>
           {tipos.map(t => <option key={t} value={t}>{t}</option>)}
         </select>
+
+        <div className="inline-flex bg-gray-100 rounded-lg p-1">
+          <button
+            onClick={() => setVistaPor('estado')}
+            className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+              vistaPor === 'estado' ? 'bg-white text-red-600 shadow-sm' : 'text-gray-600'
+            }`}
+          >
+            Por estado
+          </button>
+          <button
+            onClick={() => setVistaPor('tipo')}
+            className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+              vistaPor === 'tipo' ? 'bg-white text-red-600 shadow-sm' : 'text-gray-600'
+            }`}
+          >
+            Por tipo
+          </button>
+        </div>
+
         {(busqueda || filtroTipo) && (
           <button
             onClick={() => { setBusqueda(''); setFiltroTipo('') }}
@@ -153,14 +191,14 @@ export default function FlotaVehicular() {
         </div>
       ) : (
         <div className="space-y-6">
-          {Object.entries(porStatus).map(([status, grupo]) => {
-            const colors = STATUS_COLORS[status] ?? STATUS_COLORS['No aplica']
+          {Object.entries(porGrupo).map(([key, grupo]) => {
+            const colors = coloresGrupos[key] ?? STATUS_COLORS['No aplica']
             return (
-              <div key={status}>
+              <div key={key}>
                 <h2 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
                   <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs border ${colors.badge}`}>
                     <span className={`w-1.5 h-1.5 rounded-full ${colors.dot}`} />
-                    {status}
+                    {key}
                   </span>
                   <span className="text-gray-400 font-normal">
                     {grupo.length} vehículo{grupo.length !== 1 ? 's' : ''}
@@ -177,7 +215,9 @@ export default function FlotaVehicular() {
                         <span className={`w-1.5 h-1.5 rounded-full ${colors.dot}`} />
                         <p className="font-bold text-gray-900 text-sm">{v.placa || '—'}</p>
                       </div>
-                      <p className="text-gray-500 text-xs truncate mt-1">{v.tipo_vehiculo || 'Vehículo'}</p>
+                      <p className="text-gray-500 text-xs truncate mt-1">
+                        {vistaPor === 'tipo' ? (v.status || 'Sin estado') : (v.tipo_vehiculo || 'Vehículo')}
+                      </p>
                     </button>
                   ))}
                 </div>
