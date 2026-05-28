@@ -103,6 +103,9 @@ export default function ServicioNuevo() {
         .insert({
           placa:                placaSeleccionada.placa,
           tipo_vehiculo:        placaSeleccionada.tipo_vehiculo,
+          marca:                placaSeleccionada.marca ?? '',
+          linea:                placaSeleccionada.linea ?? '',
+          anio:                 placaSeleccionada.anio ?? null,
           odoo_product_id:      placaSeleccionada.odoo_id,
           tipo_servicio:        tipoServicio,
           taller_id:            tallerId || null,

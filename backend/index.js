@@ -82,6 +82,37 @@ async function getUid() {
 }
 
 // Helper: obtener vehículo desde líneas de un pedido de venta
+// Helper: parsear nombre del producto Odoo para extraer marca / línea / año
+// Formato observado: "P-006KXB TOYOTA PICK UP HI LUX 2025 - AUTO PLATEADO METALICO"
+//                    "P-091LCM TOYOTA AGYA 2025 BLANCO"
+//                    "TOYOTA YARIS 2023"
+function parseProductName(name, placa) {
+  if (!name) return { marca: '', linea: '', anio: null };
+
+  let s = name.trim();
+  if (placa && s.toUpperCase().startsWith(placa.toUpperCase())) {
+    s = s.slice(placa.length).trim();
+  }
+  // Quita color/notas después del primer guión
+  const dashIdx = s.indexOf(' - ');
+  if (dashIdx > -1) s = s.slice(0, dashIdx).trim();
+
+  // Extrae el año (4 dígitos entre 1990 y current_year+1)
+  const yearMatch = s.match(/\b(19|20)\d{2}\b/);
+  const anio = yearMatch ? parseInt(yearMatch[0]) : null;
+  if (yearMatch) s = s.replace(yearMatch[0], '').trim();
+
+  // Quita texto residual de color al final si quedó
+  s = s.replace(/\s+(BLANCO|NEGRO|GRIS|ROJO|AZUL|PLATEADO|METALICO|VERDE|BEIGE|CAFE)\b.*$/i, '').trim();
+
+  // Primer token = marca; resto = línea
+  const tokens = s.split(/\s+/).filter(Boolean);
+  const marca = tokens[0] || '';
+  const linea = tokens.slice(1).join(' ').trim();
+
+  return { marca, linea, anio };
+}
+
 async function getVehiculoFromOrder(uid, orderId, orderLines) {
   if (!orderLines || !orderLines.length) return null;
   try {
@@ -98,12 +129,16 @@ async function getVehiculoFromOrder(uid, orderId, orderLines) {
 
     if (!productos.length) return null;
     const p = productos[0];
+    const parsed = parseProductName(p.name, p.default_code);
     return {
       odoo_id: p.id,
       nombre: p.name,
       placa: p.default_code || '',
       tipo_vehiculo: p.x_studio_tipo_de_vehiculo || '',
       status: p.x_studio_status_vehiculo || '',
+      marca: parsed.marca,
+      linea: parsed.linea,
+      anio: parsed.anio,
     };
   } catch (err) {
     console.warn('[getVehiculoFromOrder] Error:', err.message);
@@ -194,14 +229,20 @@ app.get('/vehiculos', async (req, res) => {
       limit: parseInt(req.query.limit) || 200,
     });
 
-    const result = vehiculos.map(v => ({
-      odoo_id: v.id,
-      nombre: v.name,
-      placa: v.default_code || '',
-      tipo_vehiculo: v.x_studio_tipo_de_vehiculo || '',
-      status: v.x_studio_status_vehiculo || '',
-      tipo_servicio: v.x_studio_tipo_de_servicio || '',
-    }));
+    const result = vehiculos.map(v => {
+      const parsed = parseProductName(v.name, v.default_code);
+      return {
+        odoo_id: v.id,
+        nombre: v.name,
+        placa: v.default_code || '',
+        tipo_vehiculo: v.x_studio_tipo_de_vehiculo || '',
+        status: v.x_studio_status_vehiculo || '',
+        tipo_servicio: v.x_studio_tipo_de_servicio || '',
+        marca: parsed.marca,
+        linea: parsed.linea,
+        anio: parsed.anio,
+      };
+    });
 
     res.json({ count: result.length, vehiculos: result });
   } catch (err) {
@@ -266,6 +307,7 @@ app.get('/vehiculo/:placa', async (req, res) => {
       console.warn('[GET /vehiculo] Error buscando contrato:', err.message);
     }
 
+    const parsed = parseProductName(vehiculo.name, vehiculo.default_code);
     res.json({
       vehiculo: {
         odoo_id: vehiculo.id,
@@ -273,6 +315,9 @@ app.get('/vehiculo/:placa', async (req, res) => {
         placa: vehiculo.default_code || '',
         tipo_vehiculo: vehiculo.x_studio_tipo_de_vehiculo || '',
         status: vehiculo.x_studio_status_vehiculo || '',
+        marca: parsed.marca,
+        linea: parsed.linea,
+        anio: parsed.anio,
       },
       contrato,
     });
