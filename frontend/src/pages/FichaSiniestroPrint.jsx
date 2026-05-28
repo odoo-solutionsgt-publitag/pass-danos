@@ -64,7 +64,7 @@ export default function FichaSiniestroPrint() {
       {/* Header con marca roja para daño */}
       <header className="border-b-4 border-red-600 pb-4 mb-6 flex items-start justify-between">
         <div className="flex items-center gap-4">
-          <img src="/logo-pass.png" alt="Pass Rent a Car" className="h-16 object-contain" onError={(e) => { e.target.style.display = 'none' }} />
+          <img src="/pass-35-logo.png" alt="Pass Rent a Car" className="h-16 object-contain" onError={(e) => { e.target.style.display = 'none' }} />
           <div>
             <h1 className="text-2xl font-bold text-gray-900 leading-tight">FICHA DE DAÑO VEHICULAR</h1>
             <p className="text-xs text-gray-500 mt-0.5">Gestión de Daños · Pass Rent a Car Guatemala</p>

@@ -68,12 +68,20 @@ export default function Sidebar({ open, onClose }) {
         className={`fixed top-0 left-0 h-full w-64 bg-gray-900 z-30 flex flex-col transition-transform duration-300
           ${open ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 lg:static lg:z-auto`}
       >
-        <div className="flex items-center justify-between px-4 py-5 border-b border-gray-700">
-          <div>
-            <p className="text-white font-bold text-base leading-tight">PASS</p>
-            <p className="text-gray-400 text-xs">Gestión de Daños</p>
+        <div className="flex items-center justify-between px-4 py-4 border-b border-gray-700">
+          <div className="flex items-center gap-3 min-w-0">
+            <img
+              src="/pass-35-logo.png"
+              alt="Pass Rent a Car"
+              className="h-12 w-auto object-contain bg-white rounded-md p-1 shrink-0"
+              onError={(e) => { e.target.style.display = 'none' }}
+            />
+            <div className="min-w-0">
+              <p className="text-white font-bold text-sm leading-tight truncate">Pass Rent a Car</p>
+              <p className="text-gray-400 text-xs">Gestión de Daños</p>
+            </div>
           </div>
-          <button onClick={onClose} className="lg:hidden text-gray-400 hover:text-white">
+          <button onClick={onClose} className="lg:hidden text-gray-400 hover:text-white shrink-0">
             <X size={20} />
           </button>
         </div>

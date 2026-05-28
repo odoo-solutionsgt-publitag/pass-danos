@@ -33,8 +33,15 @@ export default function Login() {
     <div className="min-h-screen bg-gray-900 flex items-center justify-center px-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-red-600 rounded-2xl mb-4">
-            <span className="text-white font-bold text-2xl">P</span>
+          <div className="inline-flex items-center justify-center bg-white rounded-2xl p-4 mb-4 shadow-lg">
+            <img
+              src="/pass-35-logo.png"
+              alt="Pass Rent a Car"
+              className="h-16 w-auto object-contain"
+              onError={(e) => {
+                e.target.outerHTML = '<span class="text-red-600 font-bold text-3xl">P</span>'
+              }}
+            />
           </div>
           <h1 className="text-white text-2xl font-bold">Pass Rent a Car</h1>
           <p className="text-gray-400 text-sm mt-1">Gestión de Daños y Servicios</p>

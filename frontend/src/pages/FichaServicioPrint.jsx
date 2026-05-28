@@ -67,7 +67,7 @@ export default function FichaServicioPrint() {
       <header className="relative pb-4 mb-6 flex items-start justify-between">
         <div className="absolute left-0 right-0 bottom-0 h-1 bg-gradient-to-r from-slate-700 via-slate-800 to-slate-900"></div>
         <div className="flex items-center gap-4">
-          <img src="/logo-pass.png" alt="Pass Rent a Car" className="h-16 object-contain" onError={(e) => { e.target.style.display = 'none' }} />
+          <img src="/pass-35-logo.png" alt="Pass Rent a Car" className="h-16 object-contain" onError={(e) => { e.target.style.display = 'none' }} />
           <div>
             <h1 className="text-2xl font-bold text-slate-900 leading-tight">FICHA DE SERVICIO</h1>
             <p className="text-xs text-slate-500 mt-0.5">Mantenimiento Vehicular · Pass Rent a Car Guatemala</p>
