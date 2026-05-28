@@ -1,10 +1,18 @@
 # CLAUDE.md — Pass Daños: Gestión de Daños Vehiculares
 
+## Estado del proyecto
+
+- **Fase 1**: ✅ Completada — en producción
+- **Fase 2**: 📋 Planificada — ver [plans/Plan_General_Fase2.md](plans/Plan_General_Fase2.md)
+- Cierre de Fase 1: ver [plans/Plan_Cierre_Implementacion_Fase1.md](plans/Plan_Cierre_Implementacion_Fase1.md)
+
 ## Proyecto
 
 Sistema web externo para gestionar siniestros (daños) en los vehículos de la flota de **Pass Rent a Car Guatemala** (Gold Travel Corps, S.A.). La app reemplaza 4 archivos Excel que hoy se mantienen manualmente: bitácora de daños, reporte diario, presupuestos por taller (46 hojas) y reporte de taller mensual.
 
 La app NO vive dentro de Odoo. Es una aplicación React independiente que se comunica con Odoo 19 Enterprise via un backend Node.js proxy (XML-RPC). Los datos propios de la app (siniestros, cotizaciones, cobros, documentos) viven en Supabase.
+
+**Acceso**: SSO contra Odoo — los usuarios entran con sus credenciales de Odoo (controlado por el campo `x_can_access_danos` en `res.users`). El admin tiene cuenta nativa adicional en Supabase Auth como break-glass.
 
 ---
 
@@ -32,39 +40,52 @@ La app NO vive dentro de Odoo. Es una aplicación React independiente que se com
 
 ```
 pass-danos/
-├── CLAUDE.md              ← Este archivo
+├── CLAUDE.md
 ├── README.md
-├── .gitignore
+├── 002_servicios_mantenimiento.sql
+├── plans/                   ← Documentación por fase (00-10, F2_A-J, cierre)
+├── odoo_addons/
+│   └── pass_gestion_danos/  ← Módulo Odoo: campo x_can_access_danos + menú "Gestión de Daños/Mant"
 ├── backend/
 │   ├── package.json
-│   └── index.js           ← Express server con Odoo XML-RPC proxy
+│   ├── Dockerfile           ← node:22-alpine (bypass Nixpacks)
+│   └── index.js             ← Express + XML-RPC + SSO Odoo + JWT firmado
 └── frontend/
     ├── package.json
     ├── vite.config.js
     ├── tailwind.config.js
     ├── index.html
     ├── public/
+    │   └── pass-35-logo.png  ← Logo Pass Rent a Car 35 años
     └── src/
         ├── main.jsx
         ├── App.jsx
         ├── lib/
-        │   ├── supabase.js       ← createClient con anon key
-        │   └── odoo-api.js       ← fetch wrapper al backend
+        │   ├── supabase.js
+        │   └── odoo-api.js
         ├── hooks/
         │   └── useAuth.js
         ├── components/
-        │   ├── Layout.jsx         ← Sidebar + header + outlet
+        │   ├── Layout.jsx
         │   ├── Sidebar.jsx
-        │   └── ProtectedRoute.jsx
+        │   ├── ProtectedRoute.jsx
+        │   ├── CotizacionesSection.jsx
+        │   ├── ProformaSection.jsx
+        │   └── DocumentosSection.jsx
         └── pages/
-            ├── Login.jsx
+            ├── Login.jsx           ← Tabs Odoo / Admin
             ├── Dashboard.jsx
             ├── Siniestros.jsx
             ├── SiniestroDetalle.jsx
             ├── SiniestroNuevo.jsx
-            ├── Cotizaciones.jsx
+            ├── Servicios.jsx
+            ├── ServicioDetalle.jsx
+            ├── ServicioNuevo.jsx
             ├── Proformas.jsx
             ├── FlotaVehicular.jsx
+            ├── BitacoraVehiculo.jsx ← URL única /bitacora/:placa, syncada a Odoo
+            ├── FichaSiniestroPrint.jsx ← /siniestros/:id/imprimir
+            ├── FichaServicioPrint.jsx  ← /servicios/:id/imprimir
             ├── Catalogos.jsx
             ├── Repositorio.jsx
             └── Reportes.jsx
@@ -90,13 +111,17 @@ Este proyecto sigue exactamente el patrón de `pass-ficha-digital`:
 | CSS | Tailwind CSS | 4.x |
 | Router | React Router | 7.x |
 | Icons | Lucide React | latest |
-| Backend | Node.js + Express | 18+ / 4.21 |
+| Backend | Node.js + Express | 22 / 4.21 |
 | XML-RPC | xmlrpc (npm) | 1.3.2 |
+| JWT (SSO) | jsonwebtoken | 9.0 |
+| UUID v5 | uuid | 10.x |
 | Base de datos | Supabase (PostgreSQL) | — |
-| Auth | Supabase Auth | email+password |
+| Auth | Supabase Auth + SSO Odoo (JWT firmado HS256) | — |
 | Storage | Supabase Storage | bucket "documentos" |
 | ERP | Odoo 19 Enterprise | — |
+| Módulo Odoo | pass_gestion_danos | 19.0.1.0.0 |
 | Hosting | Coolify v4 (Docker) | Contabo VPS |
+| Build | Backend: Dockerfile · Frontend: Nixpacks | — |
 | Automations | n8n | ya desplegado |
 
 ---
@@ -130,7 +155,10 @@ ODOO_DB=odoo19server
 ODOO_API_USER=<usuario API de Odoo>
 ODOO_API_PASSWORD=<API key de Odoo>
 SUPABASE_URL=https://cxoqviwdryvjahykazpb.supabase.co
-SUPABASE_SERVICE_KEY=<service_role secret key>
+SUPABASE_SERVICE_KEY=sb_secret_...                        # nuevo formato API key (admin)
+SUPABASE_JWT_SECRET=<Legacy JWT Secret de Supabase>       # para firmar JWTs SSO (HS256)
+ODOO_DANOS_NAMESPACE_UUID=<UUID v4 generado una vez>      # namespace para uuidv5 de usuarios Odoo
+BITACORA_BASE_URL=https://gestion-danos.odoo-server.online # opcional, default deriva de CORS_ORIGIN
 ```
 
 ### Variables de entorno — Frontend
@@ -694,3 +722,130 @@ registrado → cotizando → proforma_emitida → proforma_aprobada → en_repar
 5. **Ficha Digital de referencia**: El proyecto `pass-ficha-digital` en el mismo repo de GitHub y Coolify es el patrón a seguir. Misma estructura, misma metodología de deploy.
 
 6. **Dominio frontend**: `gestion-danos.odoo-server.online` (dev). Producción eventual: subdominio de `passrentacar.net.gt`.
+
+---
+
+## Características agregadas en Fase 1 (post-CLAUDE.md original)
+
+Estas funcionalidades NO estaban en el plan inicial pero se construyeron durante la implementación:
+
+### 1. Módulo de Servicios de Mantenimiento
+Tabla paralela `ordenes_servicio` con su propio flujo (programado → aprobado → en_proceso → completado). 7 tipos. Lógica `requiere_autorizacion` automática. Comparte `taller_ingresos` y `documentos` con siniestros via CHECK constraint.
+
+### 2. Bitácora del Vehículo (URL única por placa)
+- Ruta `/bitacora/:placa` muestra expediente completo del vehículo
+- URL sincronizada automáticamente al campo Odoo `x_studio_bitacora_de_servicios` después de cada INSERT de daño o servicio
+- Endpoint backend `POST /odoo/sync-bitacora-all` para poblar todos los vehículos de la flota
+
+### 3. SSO Odoo → Supabase
+- Login con credenciales de Odoo
+- Backend autentica via XML-RPC `authenticate` con credenciales arbitrarias
+- Lee `res.users.x_can_access_danos` para validar acceso
+- Firma JWT HS256 con SUPABASE_JWT_SECRET (TTL 1h)
+- UUID determinístico via `uuidv5("odoo:" + uid, NAMESPACE)` para mapear a `auth.users`
+- Frontend usa `supabase.auth.setSession(jwt)` → RLS funciona normalmente
+
+### 4. Módulo Odoo `pass_gestion_danos`
+Ubicación: `odoo_addons/pass_gestion_danos/`
+- Extiende `res.users` con campo `x_can_access_danos` (Boolean)
+- Vista heredada con tab "Pass — Apps Externas"
+- Menú "Gestión de Daños/Mant" en Rental (sequence=50)
+- `ir.actions.act_url` apuntando a la app
+
+### 5. Fichas imprimibles
+- `/siniestros/:id/imprimir` — accent rojo
+- `/servicios/:id/imprimir` — accent slate
+- Auto-trigger `window.print()` con CSS A4
+- Logo, firmas, campos completos
+
+### 6. Documentos contextuales
+Componente `DocumentosSection` embebido en:
+- Detalle de daño (al final)
+- Detalle de servicio (al final)
+- Cada cotización individual (vinculado a `cotizacion_id`)
+- Sección de proforma
+
+Tipos soportados ampliados: PDF, JPG, PNG, WebP, Excel (xls/xlsx), Word (doc/docx), CSV.
+
+### 7. Filtros de flota
+GET /vehiculos ahora filtra:
+- `rent_ok = true`
+- `categ_id = 2` (Vehículos)
+- `x_studio_tipo_de_vehiculo != 'Cotización'`
+
+### 8. Parsing de marca/línea/año
+Backend extrae del `product.template.name`:
+`"P-006KXB TOYOTA PICK UP HI LUX 2025 - AUTO PLATEADO METALICO"` →
+`{ marca: "TOYOTA", linea: "PICK UP HI LUX", anio: 2025 }`
+
+### 9. Lista global de proformas
+Página `/proformas` con tabla de todas las cotizaciones aprobadas, KPIs financieros (costo Pass total, cliente paga total, margen acumulado), filtros, export CSV.
+
+### 10. Botones rápidos en el header
+"+Nueva orden" (slate) y "+Nuevo Daño" (red) en el header de toda la app.
+
+---
+
+## Endpoints Backend (estado actual Fase 1)
+
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| GET | `/health` | Health check (Odoo + Supabase) |
+| POST | `/auth/odoo` | SSO: autenticar contra Odoo y devolver JWT Supabase |
+| GET | `/vehiculos` | Lista de vehículos (filtros: categoría, tipo, status) |
+| GET | `/vehiculo/:placa` | Detalle + contrato activo + cliente |
+| PATCH | `/vehiculo/:id/status` | Cambia `x_studio_status_vehiculo` |
+| GET | `/vehiculo/:id/fleet` | Datos de `fleet.vehicle` |
+| GET | `/contratos?q=` | Búsqueda de contratos |
+| GET | `/contratos/:id` | Detalle de contrato + vehículo + cliente |
+| POST | `/odoo/sync-bitacora` | Pone URL bitácora en `x_studio_bitacora_de_servicios` |
+| POST | `/odoo/sync-bitacora-all` | Sincroniza la URL en toda la flota |
+
+---
+
+## Configuración crítica de Supabase
+
+### Permisos service_role
+Al usar el nuevo formato de API keys (`sb_secret_*`), se requiere otorgar permisos explícitos:
+
+```sql
+GRANT ALL ON ALL TABLES IN SCHEMA public TO service_role;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO service_role;
+GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT EXECUTE ON FUNCTIONS TO service_role;
+```
+
+### Storage bucket
+`documentos` (privado, max 10MB) — MIME types:
+```
+application/pdf, image/jpeg, image/png, image/webp,
+application/vnd.ms-excel,
+application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,
+application/msword,
+application/vnd.openxmlformats-officedocument.wordprocessingml.document
+```
+
+### JWT firmado por backend
+Para que `supabase.auth.setSession(jwt)` acepte tokens firmados por nuestro backend:
+- Usar `SUPABASE_JWT_SECRET` = Legacy JWT Secret (visible en Project Settings → API → JWT Settings → "Legacy JWT Secret" tab)
+- Algoritmo HS256
+- Claims: `iss=supabase, sub=<userId>, aud=authenticated, role=authenticated, exp=now+3600`
+
+---
+
+## Roadmap Fase 2
+
+Ver [plans/Plan_General_Fase2.md](plans/Plan_General_Fase2.md). Incluye:
+- Auditoría granular + Roles por permiso (crear/editar/ver/eliminar)
+- Datos del cliente (fix + extensión)
+- Cotizaciones repetibles por taller con variantes (Original/Genérico)
+- Edición de cotizaciones aprobadas
+- Multi-contacto en talleres con área (7 categorías)
+- Forma de pago en daño (Cliente/PASS/Seguro)
+- 6 tipos de servicio adicionales
+- Fechas adicionales (entrega taller, estimada/real finalización)
+- Anulados invisibles para usuarios
+- Descuento en líneas de detalle
+- Checklist de cierre (Prefactura/Proforma/Factura)
