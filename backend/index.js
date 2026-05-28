@@ -219,6 +219,7 @@ app.get('/vehiculos', async (req, res) => {
     const domain = [
       ['rent_ok', '=', true],
       ['categ_id', '=', 2],
+      ['x_studio_tipo_de_vehiculo', '!=', 'Cotización'],
     ];
     if (req.query.status) domain.push(['x_studio_status_vehiculo', '=', req.query.status]);
     if (req.query.placa) domain.push(['default_code', 'ilike', req.query.placa]);
