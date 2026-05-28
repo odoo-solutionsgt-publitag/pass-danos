@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, ArrowRight, Check, Search, FileText, Car, Building2, X } from 'lucide-react'
 import { supabase } from '../lib/supabase'
-import { fetchVehiculos, fetchVehiculo, buscarContratos, fetchContratoById } from '../lib/odoo-api'
+import { fetchVehiculos, fetchVehiculo, buscarContratos, fetchContratoById, syncBitacora } from '../lib/odoo-api'
 import { useAuth } from '../hooks/useAuth'
 
 const TIPOS_DANO = [
@@ -293,6 +293,11 @@ export default function SiniestroNuevo() {
       }).select().single()
 
       if (err) throw err
+
+      // Sincronizar URL de bitácora en Odoo (best-effort, no bloquea)
+      syncBitacora({ placa: form.placa.toUpperCase(), odoo_product_id: form.odoo_product_id })
+        .catch(e => console.warn('[syncBitacora]', e.message))
+
       navigate(`/siniestros/${data.id}`)
     } catch (err) {
       setError(err.message)

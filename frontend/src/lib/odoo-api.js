@@ -37,3 +37,13 @@ export async function buscarContratos(q) {
 export async function fetchContratoById(odooId) {
   return apiFetch(`/contratos/${odooId}`)
 }
+
+// Actualiza el campo x_studio_bitacora_de_servicios en el product.template
+// de Odoo para que apunte a la URL única de la bitácora del vehículo
+export async function syncBitacora({ placa, odoo_product_id }) {
+  return apiFetch('/odoo/sync-bitacora', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ placa, odoo_product_id }),
+  })
+}

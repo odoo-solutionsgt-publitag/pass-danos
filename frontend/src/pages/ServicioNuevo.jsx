@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, Search, X, Plus, Trash2, AlertTriangle } from 'lucide-react'
 import { supabase } from '../lib/supabase'
-import { fetchVehiculos } from '../lib/odoo-api'
+import { fetchVehiculos, syncBitacora } from '../lib/odoo-api'
 import { useAuth } from '../hooks/useAuth'
 
 const TIPOS_SERVICIO = [
@@ -133,6 +133,10 @@ export default function ServicioNuevo() {
         const { error: errL } = await supabase.from('orden_servicio_lineas').insert(inserts)
         if (errL) throw errL
       }
+
+      // Sincronizar URL de bitácora en Odoo (best-effort, no bloquea)
+      syncBitacora({ placa: placaSeleccionada.placa, odoo_product_id: placaSeleccionada.odoo_id })
+        .catch(e => console.warn('[syncBitacora]', e.message))
 
       navigate(`/servicios/${orden.id}`)
     } catch (e) {

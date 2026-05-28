@@ -24,6 +24,7 @@ const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
 const SUPABASE_JWT_SECRET = process.env.SUPABASE_JWT_SECRET;
 const ODOO_DANOS_NAMESPACE_UUID = process.env.ODOO_DANOS_NAMESPACE_UUID;
 const CORS_ORIGIN = process.env.CORS_ORIGIN || 'https://gestion-danos.odoo-server.online';
+const BITACORA_BASE_URL = (process.env.BITACORA_BASE_URL || CORS_ORIGIN.split(',')[0].trim()) + '/bitacora';
 
 // ============================================================
 // SUPABASE CLIENT (service role — bypasses RLS)
@@ -392,6 +393,106 @@ async function ensureSupabaseUser({ userId, email, nombre }) {
     throw new Error('Perfil desactivado en la app. Contacte al administrador.');
   }
 }
+
+// ============================================================
+// POST /odoo/sync-bitacora — Pone la URL de bitácora en el campo
+// x_studio_bitacora_de_servicios del product.template del vehículo.
+// Body: { placa } o { odoo_product_id } (al menos uno)
+// ============================================================
+
+app.post('/odoo/sync-bitacora', async (req, res) => {
+  const { placa, odoo_product_id } = req.body || {};
+  if (!placa && !odoo_product_id) {
+    return res.status(400).json({ error: 'Se requiere placa u odoo_product_id' });
+  }
+
+  try {
+    const uid = await getUid();
+    let productId = odoo_product_id;
+    let placaUp = placa ? placa.toUpperCase() : null;
+
+    // Si no nos dieron el id, buscar por placa
+    if (!productId) {
+      const found = await odooExecute(uid, 'product.template', 'search_read', [
+        [['default_code', '=', placaUp]]
+      ], { fields: ['id', 'default_code'], limit: 1 });
+      if (!found.length) {
+        return res.status(404).json({ error: `Vehículo ${placaUp} no encontrado en Odoo` });
+      }
+      productId = found[0].id;
+      placaUp = found[0].default_code;
+    } else if (!placaUp) {
+      // Si nos dieron el id pero no la placa, leerla
+      const prod = await odooExecute(uid, 'product.template', 'read', [[productId]], {
+        fields: ['default_code'],
+      });
+      if (!prod.length) {
+        return res.status(404).json({ error: `Product ${productId} no encontrado` });
+      }
+      placaUp = prod[0].default_code;
+    }
+
+    const url = `${BITACORA_BASE_URL}/${placaUp}`;
+
+    const ok = await odooExecute(uid, 'product.template', 'write', [
+      [productId], { x_studio_bitacora_de_servicios: url }
+    ]);
+    if (!ok) {
+      return res.status(500).json({ error: 'Odoo no confirmó la escritura' });
+    }
+
+    console.log(`[POST /odoo/sync-bitacora] ${placaUp} (id=${productId}) → ${url}`);
+    res.json({ success: true, odoo_product_id: productId, placa: placaUp, url });
+  } catch (err) {
+    console.error('[POST /odoo/sync-bitacora]', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================================
+// POST /odoo/sync-bitacora-all — Pobla el campo en TODOS los vehículos
+// de la flota (rent_ok=true AND categ_id=2). Útil para inicialización.
+// ============================================================
+
+app.post('/odoo/sync-bitacora-all', async (req, res) => {
+  try {
+    const uid = await getUid();
+    const products = await odooExecute(uid, 'product.template', 'search_read', [
+      [
+        ['rent_ok', '=', true],
+        ['categ_id', '=', 2],
+        ['default_code', '!=', false],
+      ]
+    ], { fields: ['id', 'default_code'], limit: 1000 });
+
+    let updated = 0;
+    const errors = [];
+    for (const p of products) {
+      if (!p.default_code) continue;
+      try {
+        const url = `${BITACORA_BASE_URL}/${p.default_code}`;
+        await odooExecute(uid, 'product.template', 'write', [
+          [p.id], { x_studio_bitacora_de_servicios: url }
+        ]);
+        updated += 1;
+      } catch (err) {
+        errors.push({ id: p.id, placa: p.default_code, error: err.message });
+      }
+    }
+
+    console.log(`[POST /odoo/sync-bitacora-all] ${updated}/${products.length} actualizados`);
+    res.json({
+      success: true,
+      total_found: products.length,
+      updated,
+      errors,
+      base_url: BITACORA_BASE_URL,
+    });
+  } catch (err) {
+    console.error('[POST /odoo/sync-bitacora-all]', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // ============================================================
 // GET /vehiculos — Lista de vehículos desde Odoo
