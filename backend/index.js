@@ -31,8 +31,13 @@ const CORS_ORIGIN = process.env.CORS_ORIGIN || 'https://gestion-danos.odoo-serve
 
 let supabase = null;
 if (SUPABASE_URL && SUPABASE_SERVICE_KEY) {
-  supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
-  console.log('[Supabase] Client initialized');
+  supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  });
+  console.log('[Supabase] Client initialized (service role)');
 }
 
 // ============================================================
@@ -313,39 +318,77 @@ app.post('/auth/odoo', async (req, res) => {
 });
 
 async function ensureSupabaseUser({ userId, email, nombre }) {
-  // 1. Asegurar fila en auth.users
-  const { data: existing } = await supabase.auth.admin.getUserById(userId);
-  if (!existing?.user) {
-    await supabase.auth.admin.createUser({
+  // 1. Verificar si el usuario ya existe en auth.users (por UUID)
+  const getRes = await supabase.auth.admin.getUserById(userId);
+  // getUserById devuelve { data: { user }, error } — error si no existe
+  const existing = getRes.data?.user || null;
+
+  if (existing) {
+    console.log(`[ensureSupabaseUser] User ${userId} ya existe en auth.users`);
+    // Actualizar si cambió
+    if (existing.email !== email || existing.user_metadata?.nombre !== nombre) {
+      const upd = await supabase.auth.admin.updateUserById(userId, {
+        email,
+        user_metadata: { nombre, provider: 'odoo' },
+      });
+      if (upd.error) {
+        console.warn('[ensureSupabaseUser] updateUserById warning:', upd.error.message);
+      }
+    }
+  } else {
+    // 1a. Verificar si ya existe alguien con ese email (id distinto)
+    const listRes = await supabase.auth.admin.listUsers({ page: 1, perPage: 200 });
+    const conflictByEmail = listRes.data?.users?.find(u => u.email === email);
+
+    if (conflictByEmail) {
+      // Existe con otro UUID — reutilizamos ese UUID en vez de crear duplicado
+      console.log(`[ensureSupabaseUser] User con email ${email} ya existía con id ${conflictByEmail.id}, reutilizando`);
+      // Actualizar el sub mapping: no, no podemos cambiar ids. Solo aceptar el existente.
+      // Para que la firma del JWT use ese UUID en vez del nuestro, hay que retornarlo.
+      throw new Error(
+        `Un usuario con email ${email} ya existe con id ${conflictByEmail.id}. ` +
+        `Esto puede pasar si el usuario fue creado manualmente antes. ` +
+        `Solución: borrar manualmente ese usuario en Supabase Auth o ajustar el namespace UUID.`
+      );
+    }
+
+    // 1b. Crear el usuario con UUID determinístico
+    const createRes = await supabase.auth.admin.createUser({
       id: userId,
       email,
       email_confirm: true,
       user_metadata: { nombre, provider: 'odoo' },
     });
-    console.log(`[ensureSupabaseUser] Created auth.users ${userId} (${email})`);
-  } else {
-    // Actualiza email/nombre si cambiaron en Odoo
-    const currentEmail = existing.user.email;
-    const currentNombre = existing.user.user_metadata?.nombre;
-    if (currentEmail !== email || currentNombre !== nombre) {
-      await supabase.auth.admin.updateUserById(userId, {
-        email,
-        user_metadata: { nombre, provider: 'odoo' },
-      });
+    if (createRes.error) {
+      console.error('[ensureSupabaseUser] createUser ERROR:', createRes.error);
+      throw new Error(`No se pudo crear el usuario en Supabase: ${createRes.error.message}`);
     }
+    if (!createRes.data?.user) {
+      throw new Error('createUser no devolvió usuario');
+    }
+    console.log(`[ensureSupabaseUser] CREADO auth.users ${userId} (${email})`);
   }
 
   // 2. Asegurar fila en perfiles
-  const { data: perfil } = await supabase.from('perfiles').select('id, rol, activo').eq('id', userId).maybeSingle();
-  if (!perfil) {
-    await supabase.from('perfiles').insert({
+  const perfilRes = await supabase.from('perfiles').select('id, rol, activo').eq('id', userId).maybeSingle();
+  if (perfilRes.error) {
+    console.error('[ensureSupabaseUser] perfiles select error:', perfilRes.error);
+    throw new Error(`Error consultando perfil: ${perfilRes.error.message}`);
+  }
+
+  if (!perfilRes.data) {
+    const insRes = await supabase.from('perfiles').insert({
       id: userId,
       nombre_completo: nombre,
       rol: 'agente',
       activo: true,
     });
+    if (insRes.error) {
+      console.error('[ensureSupabaseUser] perfiles insert error:', insRes.error);
+      throw new Error(`Error creando perfil: ${insRes.error.message}`);
+    }
     console.log(`[ensureSupabaseUser] Created perfiles row for ${userId}`);
-  } else if (!perfil.activo) {
+  } else if (!perfilRes.data.activo) {
     throw new Error('Perfil desactivado en la app. Contacte al administrador.');
   }
 }
