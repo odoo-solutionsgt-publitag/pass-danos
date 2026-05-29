@@ -47,3 +47,10 @@ export async function syncBitacora({ placa, odoo_product_id }) {
     body: JSON.stringify({ placa, odoo_product_id }),
   })
 }
+
+// Re-extrae los datos del cliente desde Odoo y los actualiza en el siniestro
+export async function refreshClienteSiniestro(siniestroId) {
+  return apiFetch(`/siniestros/${siniestroId}/refresh-cliente`, {
+    method: 'POST',
+  })
+}

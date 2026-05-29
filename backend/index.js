@@ -370,8 +370,9 @@ async function ensureSupabaseUser({ userId, email, nombre }) {
     console.log(`[ensureSupabaseUser] CREADO auth.users ${userId} (${email})`);
   }
 
-  // 2. Asegurar fila en perfiles
-  const perfilRes = await supabase.from('perfiles').select('id, rol, activo').eq('id', userId).maybeSingle();
+  // 2. Asegurar fila en perfiles — los nuevos usuarios SSO entran como
+  //    readonly por defecto. Admin los promueve después desde /usuarios.
+  const perfilRes = await supabase.from('perfiles').select('id, rol, activo, permisos').eq('id', userId).maybeSingle();
   if (perfilRes.error) {
     console.error('[ensureSupabaseUser] perfiles select error:', perfilRes.error);
     throw new Error(`Error consultando perfil: ${perfilRes.error.message}`);
@@ -381,14 +382,15 @@ async function ensureSupabaseUser({ userId, email, nombre }) {
     const insRes = await supabase.from('perfiles').insert({
       id: userId,
       nombre_completo: nombre,
-      rol: 'agente',
+      rol: 'readonly',
       activo: true,
+      permisos: { crear: false, editar: false, ver: true, eliminar: false },
     });
     if (insRes.error) {
       console.error('[ensureSupabaseUser] perfiles insert error:', insRes.error);
       throw new Error(`Error creando perfil: ${insRes.error.message}`);
     }
-    console.log(`[ensureSupabaseUser] Created perfiles row for ${userId}`);
+    console.log(`[ensureSupabaseUser] Created perfiles row for ${userId} (rol=readonly)`);
   } else if (!perfilRes.data.activo) {
     throw new Error('Perfil desactivado en la app. Contacte al administrador.');
   }
@@ -490,6 +492,74 @@ app.post('/odoo/sync-bitacora-all', async (req, res) => {
     });
   } catch (err) {
     console.error('[POST /odoo/sync-bitacora-all]', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================================
+// POST /siniestros/:id/refresh-cliente
+// Re-extrae los datos del cliente desde Odoo (res.partner) y los
+// actualiza en el siniestro. Útil cuando se completan campos en
+// Odoo después de haber registrado el daño.
+// ============================================================
+
+app.post('/siniestros/:id/refresh-cliente', async (req, res) => {
+  const { id } = req.params;
+  if (!id) return res.status(400).json({ error: 'id requerido' });
+  if (!supabase) return res.status(500).json({ error: 'Supabase no configurado' });
+
+  try {
+    // 1. Leer el siniestro
+    const sinRes = await supabase
+      .from('siniestros')
+      .select('id, numero, contrato_id, cliente_nombre')
+      .eq('id', id)
+      .maybeSingle();
+    if (sinRes.error) throw sinRes.error;
+    if (!sinRes.data) return res.status(404).json({ error: 'Siniestro no encontrado' });
+
+    const sin = sinRes.data;
+    if (!sin.contrato_id) {
+      return res.status(400).json({ error: 'El siniestro no tiene contrato vinculado en Odoo' });
+    }
+
+    // 2. Releer el contrato en Odoo
+    const uid = await getUid();
+    const orders = await odooExecute(uid, 'sale.order', 'read', [[sin.contrato_id]], {
+      fields: ['id', 'name', 'partner_id'],
+    });
+    if (!orders.length) {
+      return res.status(404).json({ error: `Contrato ${sin.contrato_id} no encontrado en Odoo` });
+    }
+    const order = orders[0];
+    if (!order.partner_id) {
+      return res.status(404).json({ error: 'El contrato no tiene cliente vinculado' });
+    }
+
+    // 3. Obtener datos frescos del partner
+    const cliente = await getClienteFromPartner(uid, order.partner_id[0], order.partner_id[1]);
+
+    // 4. Actualizar siniestro con los datos frescos (sin tocar nombre si ya estaba bien)
+    const updateData = {
+      cliente_nombre:    cliente.nombre || sin.cliente_nombre,
+      cliente_dpi:       cliente.dpi || null,
+      cliente_nit:       cliente.nit || null,
+      cliente_telefono:  cliente.telefono || null,
+      cliente_email:     cliente.email || null,
+    };
+    const updRes = await supabase.from('siniestros').update(updateData).eq('id', id);
+    if (updRes.error) throw updRes.error;
+
+    console.log(`[POST /siniestros/${id}/refresh-cliente] ${sin.numero} → cliente refrescado`);
+    res.json({
+      success: true,
+      siniestro_id: id,
+      numero: sin.numero,
+      cliente: updateData,
+      partner_id: order.partner_id[0],
+    });
+  } catch (err) {
+    console.error('[POST /siniestros/:id/refresh-cliente]', err.message);
     res.status(500).json({ error: err.message });
   }
 });
