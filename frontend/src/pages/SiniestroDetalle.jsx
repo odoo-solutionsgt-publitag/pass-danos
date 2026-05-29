@@ -2,10 +2,10 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, AlertTriangle, CheckCircle2, Clock, Wrench,
-  Car, User, FileText, X, ChevronRight, Printer,
+  Car, User, FileText, X, ChevronRight, Printer, RefreshCw,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
-import { updateVehiculoStatus } from '../lib/odoo-api'
+import { updateVehiculoStatus, refreshClienteSiniestro } from '../lib/odoo-api'
 import { useAuth } from '../hooks/useAuth'
 import { usePermisos } from '../hooks/usePermisos'
 import CotizacionesSection from '../components/CotizacionesSection'
@@ -139,6 +139,21 @@ export default function SiniestroDetalle() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [confirm, setConfirm] = useState(null)
+  const [refreshingCliente, setRefreshingCliente] = useState(false)
+
+  async function handleRefreshCliente() {
+    setRefreshingCliente(true)
+    try {
+      const res = await refreshClienteSiniestro(siniestro.id)
+      if (res?.success) {
+        await loadAll()
+      }
+    } catch (err) {
+      alert('No se pudo refrescar: ' + err.message)
+    } finally {
+      setRefreshingCliente(false)
+    }
+  }
 
 
   useEffect(() => { loadAll() }, [id])
@@ -458,12 +473,26 @@ export default function SiniestroDetalle() {
           </div>
 
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-            <div className="flex items-center gap-2 mb-4">
-              <User size={16} className="text-gray-400" />
-              <h3 className="font-semibold text-gray-800 text-sm">Cliente</h3>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <User size={16} className="text-gray-400" />
+                <h3 className="font-semibold text-gray-800 text-sm">Cliente</h3>
+              </div>
+              {siniestro.contrato_id && (
+                <button
+                  onClick={handleRefreshCliente}
+                  disabled={refreshingCliente}
+                  className="flex items-center gap-1 text-xs text-blue-600 hover:bg-blue-50 px-2 py-1 rounded disabled:opacity-50"
+                  title="Re-extraer datos del cliente desde Odoo"
+                >
+                  <RefreshCw size={12} className={refreshingCliente ? 'animate-spin' : ''} />
+                  Refrescar
+                </button>
+              )}
             </div>
             <dl className="space-y-2 text-sm">
               <Row label="Nombre" value={siniestro.cliente_nombre} bold />
+              <Row label="Contrato" value={siniestro.contrato_numero} />
               <Row label="DPI / Pasaporte" value={siniestro.cliente_dpi} />
               <Row label="NIT" value={siniestro.cliente_nit} />
               <Row label="Teléfono" value={siniestro.cliente_telefono} />

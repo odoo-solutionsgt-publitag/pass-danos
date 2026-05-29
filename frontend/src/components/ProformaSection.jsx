@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase'
 import DocumentosSection from './DocumentosSection'
 import { usePermisos } from '../hooks/usePermisos'
 
-const TIPO_LABELS = { repuesto: 'Repuesto', mano_obra: 'Mano de obra', otro: 'Otro' }
+const TIPO_LABELS = { repuesto: 'Repuesto', mano_obra: 'Mano de obra', otro: 'Otro', descuento: 'Descuento' }
 
 function fmt(n) {
   return `Q ${Number(n || 0).toLocaleString('es-GT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -60,8 +60,20 @@ export default function ProformaSection({ siniestro, onUpdate }) {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h4 className="text-sm font-semibold text-gray-700">Proforma — {cotizacion.talleres?.nombre}</h4>
-          <p className="text-xs text-gray-400 mt-0.5">Cotización aprobada</p>
+          <div className="flex items-center gap-2">
+            <h4 className="text-sm font-semibold text-gray-700">Proforma — {cotizacion.talleres?.nombre}</h4>
+            {cotizacion.variante && (
+              <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-indigo-100 text-indigo-700">
+                {cotizacion.variante}
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-gray-400 mt-0.5">
+            Cotización aprobada
+            {cotizacion.updated_at && (
+              <span> · Última edición: {new Date(cotizacion.updated_at).toLocaleString('es-GT', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+            )}
+          </p>
         </div>
         <button
           onClick={() => window.print()}
@@ -106,6 +118,11 @@ export default function ProformaSection({ siniestro, onUpdate }) {
         {Number(cotizacion.total_otros) > 0 && (
           <div className="flex justify-between text-gray-500">
             <span>Otros</span><span>{fmt(cotizacion.total_otros)}</span>
+          </div>
+        )}
+        {Number(cotizacion.total_descuentos) !== 0 && (
+          <div className="flex justify-between text-red-600">
+            <span>Descuentos</span><span>{fmt(cotizacion.total_descuentos)}</span>
           </div>
         )}
         <div className="flex justify-between font-bold text-gray-900 border-t border-gray-200 pt-2 mt-1">

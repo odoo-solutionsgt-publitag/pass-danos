@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react'
-import { Plus, Trash2, Check } from 'lucide-react'
+import { Plus, Trash2, Check, X, AlertTriangle } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import DocumentosSection from './DocumentosSection'
 import { usePermisos } from '../hooks/usePermisos'
 
-const TIPO_LABELS = { repuesto: 'Repuesto', mano_obra: 'Mano de obra', otro: 'Otro' }
+const TIPO_LABELS = { repuesto: 'Repuesto', mano_obra: 'Mano de obra', otro: 'Otro', descuento: 'Descuento' }
 
 const ESTADO_COT_COLORS = {
   solicitada: 'bg-gray-100 text-gray-600',
@@ -24,7 +24,14 @@ function fmt(n) {
   return `Q ${Number(n || 0).toLocaleString('es-GT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
-const LINEA_VACIA = { tipo: 'repuesto', descripcion: '', cantidad: '1', precio_unitario: '' }
+const LINEA_VACIA      = { tipo: 'repuesto', descripcion: '', cantidad: '1', precio_unitario: '' }
+const SOLICITUD_VACIA  = { taller_id: '', variante: '' }
+const TIPOS_LINEA_OPTS = [
+  { value: 'repuesto',  label: 'Repuesto'   },
+  { value: 'mano_obra', label: 'M. obra'    },
+  { value: 'otro',      label: 'Otro'       },
+  { value: 'descuento', label: 'Descuento'  },
+]
 
 export default function CotizacionesSection({ siniestro, onUpdate }) {
   const { puedeCrear, puedeEditar, puedeEliminar } = usePermisos()
@@ -32,7 +39,7 @@ export default function CotizacionesSection({ siniestro, onUpdate }) {
   const [talleres, setTalleres]         = useState([])
   const [loading, setLoading]           = useState(true)
   const [showSolicitar, setShowSolicitar] = useState(false)
-  const [selectedTalleres, setSelectedTalleres] = useState([])
+  const [solicitudes, setSolicitudes]   = useState([{ ...SOLICITUD_VACIA }])
   const [newLineas, setNewLineas]       = useState({})   // { [cotId]: LINEA_VACIA }
   const [saving, setSaving]             = useState(false)
   const [error, setError]               = useState('')
@@ -56,22 +63,34 @@ export default function CotizacionesSection({ siniestro, onUpdate }) {
   // ── Solicitar cotizaciones ────────────────────────────────
 
   async function handleSolicitar() {
-    if (!selectedTalleres.length) return
+    const validas = solicitudes.filter(s => s.taller_id)
+    if (!validas.length) return
     setSaving(true); setError('')
     try {
-      const inserts = selectedTalleres.map(taller_id => ({
-        siniestro_id: siniestro.id,
-        taller_id,
-        estado: 'solicitada',
+      const inserts = validas.map(s => ({
+        siniestro_id:    siniestro.id,
+        taller_id:       s.taller_id,
+        variante:        s.variante.trim() || null,
+        estado:          'solicitada',
         fecha_solicitud: new Date().toISOString().slice(0, 10),
       }))
       const { error: err } = await supabase.from('cotizaciones').insert(inserts)
       if (err) throw err
       setShowSolicitar(false)
-      setSelectedTalleres([])
+      setSolicitudes([{ ...SOLICITUD_VACIA }])
       await loadAll()
     } catch (e) { setError(e.message) }
     finally { setSaving(false) }
+  }
+
+  function setSolicitud(idx, field, value) {
+    setSolicitudes(prev => prev.map((s, i) => i === idx ? { ...s, [field]: value } : s))
+  }
+  function addSolicitudFila() {
+    setSolicitudes(prev => [...prev, { ...SOLICITUD_VACIA }])
+  }
+  function removeSolicitudFila(idx) {
+    setSolicitudes(prev => prev.length === 1 ? [{ ...SOLICITUD_VACIA }] : prev.filter((_, i) => i !== idx))
   }
 
   // ── Líneas ────────────────────────────────────────────────
@@ -149,10 +168,8 @@ export default function CotizacionesSection({ siniestro, onUpdate }) {
 
   if (loading) return <p className="text-sm text-gray-400 py-2">Cargando cotizaciones...</p>
 
-  const talleresConCot    = cotizaciones.map(c => c.taller_id)
-  const talleresLibres    = talleres.filter(t => !talleresConCot.includes(t.id))
   const hayAprobada       = cotizaciones.some(c => c.estado === 'aprobada')
-  const cotsConLineas     = cotizaciones.filter(c => (c.cotizacion_lineas ?? []).length > 0)
+  const cotsConLineas     = cotizaciones.filter(c => (c.cotizacion_lineas ?? []).length > 0 && c.estado !== 'rechazada')
   const minTotal          = cotsConLineas.length > 1
     ? Math.min(...cotsConLineas.map(c => Number(c.total_general) || 0))
     : null
@@ -163,7 +180,7 @@ export default function CotizacionesSection({ siniestro, onUpdate }) {
       {/* Header */}
       <div className="flex items-center justify-between">
         <h4 className="text-sm font-semibold text-gray-700">Cotizaciones</h4>
-        {puedeCrear && !hayAprobada && cotizaciones.length < 3 && talleresLibres.length > 0 && (
+        {puedeCrear && talleres.length > 0 && (
           <button
             onClick={() => setShowSolicitar(s => !s)}
             className="flex items-center gap-1.5 text-xs px-3 py-1.5 border border-red-200 text-red-600 rounded-lg hover:bg-red-50"
@@ -181,34 +198,56 @@ export default function CotizacionesSection({ siniestro, onUpdate }) {
       {/* Panel solicitar */}
       {showSolicitar && (
         <div className="border border-dashed border-red-200 bg-red-50 rounded-xl p-4 space-y-3">
-          <p className="text-sm font-medium text-gray-700">¿A qué taller solicitar cotización?</p>
-          <div className="space-y-1.5">
-            {talleresLibres.map(t => (
-              <label key={t.id} className="flex items-center gap-2 text-sm cursor-pointer hover:text-red-700">
-                <input
-                  type="checkbox"
-                  className="rounded accent-red-600"
-                  checked={selectedTalleres.includes(t.id)}
-                  onChange={e =>
-                    setSelectedTalleres(prev =>
-                      e.target.checked ? [...prev, t.id] : prev.filter(id => id !== t.id)
-                    )
-                  }
-                />
-                {t.nombre}
-              </label>
-            ))}
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-medium text-gray-700">Solicitudes a talleres</p>
+            <p className="text-xs text-gray-500">El mismo taller puede aparecer con variantes distintas</p>
           </div>
-          <div className="flex justify-end gap-2">
-            <button onClick={() => setShowSolicitar(false)} className="text-xs px-3 py-1.5 border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50">
+
+          <div className="space-y-2">
+            {solicitudes.map((s, idx) => (
+              <div key={idx} className="grid grid-cols-12 gap-2 items-center">
+                <select
+                  value={s.taller_id}
+                  onChange={e => setSolicitud(idx, 'taller_id', e.target.value)}
+                  className="col-span-6 text-xs border border-red-200 bg-white rounded-lg px-2 py-1.5 focus:outline-none focus:border-red-400"
+                >
+                  <option value="">Selecciona un taller...</option>
+                  {talleres.map(t => <option key={t.id} value={t.id}>{t.nombre}</option>)}
+                </select>
+                <input
+                  type="text"
+                  value={s.variante}
+                  onChange={e => setSolicitud(idx, 'variante', e.target.value)}
+                  placeholder="Variante (opcional: Original, Genérico…)"
+                  className="col-span-5 text-xs border border-red-200 bg-white rounded-lg px-2 py-1.5 focus:outline-none focus:border-red-400"
+                />
+                <button
+                  onClick={() => removeSolicitudFila(idx)}
+                  className="col-span-1 flex items-center justify-center h-full text-gray-400 hover:text-red-500 py-1.5"
+                  title="Quitar fila"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            ))}
+            <button
+              onClick={addSolicitudFila}
+              className="flex items-center gap-1.5 text-xs text-red-600 hover:bg-red-100 px-2 py-1 rounded"
+            >
+              <Plus size={12} /> Agregar otro taller
+            </button>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2 border-t border-red-100">
+            <button onClick={() => { setShowSolicitar(false); setSolicitudes([{ ...SOLICITUD_VACIA }]) }} className="text-xs px-3 py-1.5 border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50">
               Cancelar
             </button>
             <button
               onClick={handleSolicitar}
-              disabled={!selectedTalleres.length || saving}
+              disabled={!solicitudes.some(s => s.taller_id) || saving}
               className="text-xs px-4 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg disabled:opacity-50"
             >
-              Solicitar {selectedTalleres.length > 0 && `(${selectedTalleres.length})`}
+              Solicitar ({solicitudes.filter(s => s.taller_id).length})
             </button>
           </div>
         </div>
@@ -216,7 +255,7 @@ export default function CotizacionesSection({ siniestro, onUpdate }) {
 
       {cotizaciones.length === 0 && (
         <p className="text-sm text-gray-400 text-center py-6">
-          No hay cotizaciones. Solicita a 1-3 talleres para comenzar.
+          No hay cotizaciones. Solicita a uno o más talleres para comenzar.
         </p>
       )}
 
@@ -224,7 +263,10 @@ export default function CotizacionesSection({ siniestro, onUpdate }) {
       {cotizaciones.map(cot => {
         const nl       = newLineas[cot.id] ?? LINEA_VACIA
         const lineas   = cot.cotizacion_lineas ?? []
-        const bloqueada = cot.estado === 'aprobada' || cot.estado === 'rechazada'
+        // Solo se bloquea cuando está rechazada. Aprobada SÍ se puede editar
+        // (los cambios sincronizan automáticamente siniestros.costo_pass vía trigger SQL).
+        const bloqueada = cot.estado === 'rechazada'
+        const editableAprobada = cot.estado === 'aprobada'
 
         return (
           <div
@@ -237,13 +279,18 @@ export default function CotizacionesSection({ siniestro, onUpdate }) {
           >
             {/* Encabezado */}
             <div className={`flex items-center justify-between px-4 py-3 ${cot.estado === 'aprobada' ? 'bg-green-50' : 'bg-gray-50'}`}>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-sm font-semibold text-gray-800">{cot.talleres?.nombre}</span>
+                {cot.variante && (
+                  <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-indigo-100 text-indigo-700">
+                    {cot.variante}
+                  </span>
+                )}
                 <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${ESTADO_COT_COLORS[cot.estado]}`}>
                   {ESTADO_COT_LABELS[cot.estado]}
                 </span>
               </div>
-              {puedeEditar && !bloqueada && lineas.length > 0 && (
+              {puedeEditar && !bloqueada && !editableAprobada && lineas.length > 0 && (
                 <button
                   onClick={() => handleAprobar(cot.id, cot.taller_id)}
                   disabled={saving}
@@ -253,10 +300,17 @@ export default function CotizacionesSection({ siniestro, onUpdate }) {
                   Aprobar esta cotización
                 </button>
               )}
-              {cot.estado === 'aprobada' && (
+              {editableAprobada && (
                 <span className="text-xs text-green-700 font-medium">✓ Cotización aprobada</span>
               )}
             </div>
+
+            {editableAprobada && puedeEditar && (
+              <div className="bg-amber-50 border-b border-amber-100 px-4 py-2 flex items-center gap-2 text-xs text-amber-700">
+                <AlertTriangle size={12} />
+                <span>Esta cotización está aprobada. Si modificas las líneas, el costo Pass se actualiza automáticamente.</span>
+              </div>
+            )}
 
             <div className="p-4 space-y-3">
 
@@ -311,6 +365,11 @@ export default function CotizacionesSection({ siniestro, onUpdate }) {
                       <span>Otros</span><span>{fmt(cot.total_otros)}</span>
                     </div>
                   )}
+                  {Number(cot.total_descuentos) !== 0 && (
+                    <div className="flex justify-between text-red-600">
+                      <span>Descuentos</span><span>{fmt(cot.total_descuentos)}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between font-bold text-sm text-gray-900 border-t border-gray-200 pt-1.5 mt-1">
                     <span>Total</span><span>{fmt(cot.total_general)}</span>
                   </div>
@@ -327,9 +386,7 @@ export default function CotizacionesSection({ siniestro, onUpdate }) {
                       onChange={e => setNl(cot.id, 'tipo', e.target.value)}
                       className="col-span-2 text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-red-400 bg-white"
                     >
-                      <option value="repuesto">Repuesto</option>
-                      <option value="mano_obra">M. obra</option>
-                      <option value="otro">Otro</option>
+                      {TIPOS_LINEA_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                     </select>
                     <input
                       value={nl.descripcion}
@@ -401,8 +458,8 @@ export default function CotizacionesSection({ siniestro, onUpdate }) {
                         key={c.id}
                         className={`px-4 py-3 text-xs font-semibold text-center ${esMenor ? 'text-green-700 bg-green-50' : 'text-gray-700'}`}
                       >
-                        {c.talleres?.nombre}
-                        {esMenor && <span className="ml-1">★</span>}
+                        <div>{c.talleres?.nombre}{esMenor && <span className="ml-1">★</span>}</div>
+                        {c.variante && <div className="text-[10px] font-normal text-indigo-600 mt-0.5">{c.variante}</div>}
                       </th>
                     )
                   })}
@@ -410,14 +467,15 @@ export default function CotizacionesSection({ siniestro, onUpdate }) {
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {[
-                  { key: 'total_repuestos', label: 'Repuestos' },
-                  { key: 'total_mano_obra', label: 'Mano de obra' },
-                  { key: 'total_otros', label: 'Otros' },
+                  { key: 'total_repuestos',  label: 'Repuestos',    color: '' },
+                  { key: 'total_mano_obra',  label: 'Mano de obra', color: '' },
+                  { key: 'total_otros',      label: 'Otros',        color: '' },
+                  { key: 'total_descuentos', label: 'Descuentos',   color: 'text-red-600' },
                 ].map(row => (
                   <tr key={row.key}>
-                    <td className="px-4 py-2 text-xs text-gray-500">{row.label}</td>
+                    <td className={`px-4 py-2 text-xs ${row.color || 'text-gray-500'}`}>{row.label}</td>
                     {cotsConLineas.map(c => (
-                      <td key={c.id} className="px-4 py-2 text-xs text-center text-gray-700">
+                      <td key={c.id} className={`px-4 py-2 text-xs text-center ${row.color || 'text-gray-700'}`}>
                         {fmt(c[row.key])}
                       </td>
                     ))}
