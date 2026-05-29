@@ -10,6 +10,7 @@ import {
   BarChart3,
   LogOut,
   X,
+  Users,
 } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
 
@@ -25,6 +26,10 @@ const NAV_CONFIG = [
   { to: '/catalogos', label: 'Catálogos', icon: BookOpen },
   { to: '/repositorio', label: 'Repositorio', icon: FolderOpen },
   { to: '/reportes', label: 'Reportes', icon: BarChart3 },
+]
+
+const NAV_ADMIN = [
+  { to: '/usuarios', label: 'Usuarios', icon: Users },
 ]
 
 function NavItem({ to, label, icon: Icon, onClick }) {
@@ -95,11 +100,22 @@ export default function Sidebar({ open, onClose }) {
           </div>
 
           <p className="text-gray-500 text-xs font-semibold uppercase tracking-wider px-3 mb-2">Configuración</p>
-          <div className="space-y-1">
+          <div className="space-y-1 mb-6">
             {NAV_CONFIG.map(item => (
               <NavItem key={item.to} {...item} onClick={onClose} />
             ))}
           </div>
+
+          {perfil?.rol === 'admin' && (
+            <>
+              <p className="text-gray-500 text-xs font-semibold uppercase tracking-wider px-3 mb-2">Administración</p>
+              <div className="space-y-1">
+                {NAV_ADMIN.map(item => (
+                  <NavItem key={item.to} {...item} onClick={onClose} />
+                ))}
+              </div>
+            </>
+          )}
         </nav>
 
         <div className="px-3 py-4 border-t border-gray-700">

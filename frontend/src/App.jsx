@@ -17,6 +17,7 @@ import Reportes from './pages/Reportes'
 import FichaSiniestroPrint from './pages/FichaSiniestroPrint'
 import FichaServicioPrint from './pages/FichaServicioPrint'
 import BitacoraVehiculo from './pages/BitacoraVehiculo'
+import Usuarios from './pages/Usuarios'
 
 export default function App() {
   return (
@@ -50,6 +51,7 @@ export default function App() {
           <Route path="catalogos" element={<Catalogos />} />
           <Route path="repositorio" element={<Repositorio />} />
           <Route path="reportes" element={<Reportes />} />
+          <Route path="usuarios" element={<Usuarios />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>
