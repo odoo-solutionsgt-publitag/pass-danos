@@ -26,6 +26,7 @@ Profundizar el control operacional del sistema: auditoría completa de todos los
 | H | Anulados invisibles para usuarios | [Plan_F2_H_Anulados_Invisibles.md](Plan_F2_H_Anulados_Invisibles.md) | Baja |
 | I | Descuento en líneas de detalle | [Plan_F2_I_Descuento_Lineas.md](Plan_F2_I_Descuento_Lineas.md) | Media |
 | J | Checklist de documentos al cierre (Prefactura/Proforma/Factura) | [Plan_F2_J_Checklist_Documentos.md](Plan_F2_J_Checklist_Documentos.md) | Alta |
+| K | Simplificar `x_studio_status_vehiculo` a 3 valores (Disponible / En Mantenimiento / En Reparación) | [Plan_F2_K_Status_Vehiculo_Odoo.md](Plan_F2_K_Status_Vehiculo_Odoo.md) | Media |
 
 ---
 
