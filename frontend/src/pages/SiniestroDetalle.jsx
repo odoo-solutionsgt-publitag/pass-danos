@@ -9,6 +9,7 @@ import { updateVehiculoStatus, refreshClienteSiniestro } from '../lib/odoo-api'
 import { useAuth } from '../hooks/useAuth'
 import { usePermisos } from '../hooks/usePermisos'
 import CotizacionesSection from '../components/CotizacionesSection'
+import CotizacionesHistorico from '../components/CotizacionesHistorico'
 import ProformaSection from '../components/ProformaSection'
 import DocumentosSection from '../components/DocumentosSection'
 import ChecklistCierre from '../components/ChecklistCierre'
@@ -557,6 +558,11 @@ export default function SiniestroDetalle() {
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
             <ProformaSection siniestro={siniestro} onUpdate={loadAll} />
           </div>
+        )}
+
+        {/* ── Histórico de cotizaciones (colapsable, readonly, desde proforma_emitida) ── */}
+        {['proforma_emitida', 'proforma_aprobada', 'en_reparacion', 'reparado', 'en_cobro', 'cerrado'].includes(estado) && (
+          <CotizacionesHistorico siniestro={siniestro} />
         )}
 
         {/* ── Taller ──────────────────────────────────────────── */}
