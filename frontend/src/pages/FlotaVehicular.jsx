@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { RefreshCw, Search, X, Car, Calendar, User, Phone, Mail, FileText, AlertCircle } from 'lucide-react'
 import { fetchVehiculos, fetchVehiculo } from '../lib/odoo-api'
 import { supabase } from '../lib/supabase'
+import { siniestrosQuery, ordenesServicioQuery } from '../lib/queries'
 import { usePermisos } from '../hooks/usePermisos'
 
 const STATUS_COLORS = {
@@ -260,13 +261,11 @@ function VehiculoDrawer({ vehiculo, onClose }) {
       try {
         const [detalleRes, sinRes, srvRes] = await Promise.all([
           fetchVehiculo(vehiculo.placa).catch(err => ({ _err: err.message })),
-          supabase.from('siniestros')
-            .select('id,numero,fecha_dano,tipo_dano,severidad,estado,total_general:costo_pass')
+          siniestrosQuery('id,numero,fecha_dano,tipo_dano,severidad,estado,total_general:costo_pass')
             .eq('placa', vehiculo.placa)
             .order('created_at', { ascending: false })
             .limit(10),
-          supabase.from('ordenes_servicio')
-            .select('id,numero,fecha_programada,tipo_servicio,estado,total_general')
+          ordenesServicioQuery('id,numero,fecha_programada,tipo_servicio,estado,total_general')
             .eq('placa', vehiculo.placa)
             .order('created_at', { ascending: false })
             .limit(10),

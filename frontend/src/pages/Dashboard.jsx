@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AlertTriangle, FileText, Wrench, Car, Clock } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { siniestrosQuery } from '../lib/queries'
 
 const ESTADO_LABELS = {
   registrado: 'Registrado',
@@ -72,7 +73,7 @@ export default function Dashboard() {
           .is('fecha_egreso', null),
         supabase.from('ordenes_servicio').select('*', { count: 'exact', head: true })
           .eq('estado', 'en_proceso'),
-        supabase.from('siniestros').select('id,numero,placa,cliente_nombre,tipo_dano,severidad,estado,created_at')
+        siniestrosQuery('id,numero,placa,cliente_nombre,tipo_dano,severidad,estado,created_at')
           .order('created_at', { ascending: false }).limit(5),
         supabase.from('siniestro_timeline').select('id,accion,detalle,created_at,siniestros(numero,placa)')
           .order('created_at', { ascending: false }).limit(10),

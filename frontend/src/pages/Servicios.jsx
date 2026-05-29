@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Plus, Search, Printer } from 'lucide-react'
 import { usePermisos } from '../hooks/usePermisos'
-import { supabase } from '../lib/supabase'
+import { ordenesServicioQuery } from '../lib/queries'
 
 const ESTADO_COLORS = {
   programado: 'bg-gray-100 text-gray-700',
@@ -52,9 +52,7 @@ export default function Servicios() {
 
   async function loadOrdenes() {
     setLoading(true)
-    let q = supabase
-      .from('ordenes_servicio')
-      .select('id,numero,fecha_programada,placa,tipo_servicio,taller_id,talleres(nombre),total_general,estado')
+    let q = ordenesServicioQuery('id,numero,fecha_programada,placa,tipo_servicio,taller_id,talleres(nombre),total_general,estado')
       .order('created_at', { ascending: false })
       .limit(200)
 
@@ -119,7 +117,6 @@ export default function Servicios() {
           <option value="aprobado">Aprobado</option>
           <option value="en_proceso">En proceso</option>
           <option value="completado">Completado</option>
-          <option value="cancelado">Cancelado</option>
         </select>
       </div>
 

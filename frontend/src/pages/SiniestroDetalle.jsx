@@ -11,6 +11,9 @@ import { usePermisos } from '../hooks/usePermisos'
 import CotizacionesSection from '../components/CotizacionesSection'
 import ProformaSection from '../components/ProformaSection'
 import DocumentosSection from '../components/DocumentosSection'
+import ChecklistCierre from '../components/ChecklistCierre'
+import FechasTaller from '../components/FechasTaller'
+import HistorialCambios from '../components/HistorialCambios'
 
 // ── Labels y colores ──────────────────────────────────────────
 
@@ -563,6 +566,31 @@ export default function SiniestroDetalle() {
           </div>
         )}
 
+        {/* ── Fechas de taller ────────────────────────────────── */}
+        <FechasTaller
+          tabla="siniestros"
+          registroId={siniestro.id}
+          valores={{
+            fecha_entrega_taller:   siniestro.fecha_entrega_taller,
+            fecha_estimada_entrega: siniestro.fecha_estimada_entrega,
+            fecha_real_entrega:     siniestro.fecha_real_entrega,
+          }}
+          onUpdate={() => loadAll()}
+        />
+
+        {/* ── Checklist de cierre ─────────────────────────────── */}
+        {['reparado', 'en_cobro', 'cerrado'].includes(estado) && (
+          <ChecklistCierre
+            tabla="siniestros"
+            registroId={siniestro.id}
+            valores={{
+              tiene_prefactura: siniestro.tiene_prefactura,
+              tiene_proforma:   siniestro.tiene_proforma,
+              tiene_factura:    siniestro.tiene_factura,
+            }}
+          />
+        )}
+
         {/* ── Documentos ──────────────────────────────────────── */}
         <DocumentosSection
           origen="siniestro"
@@ -607,6 +635,9 @@ export default function SiniestroDetalle() {
             </ol>
           )}
         </div>
+
+        {/* ── Historial de cambios (audit_log) ─────────────────── */}
+        <HistorialCambios tabla="siniestros" filaId={siniestro.id} />
 
       </div>
     </>

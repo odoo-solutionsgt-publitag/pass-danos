@@ -45,6 +45,7 @@ export default function Proformas() {
         )
       `)
       .eq('estado', 'aprobada')
+      .neq('siniestros.estado', 'anulado')
       .order('created_at', { ascending: false })
       .limit(300)
     setProformas(data ?? [])

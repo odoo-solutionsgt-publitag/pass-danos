@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Plus, Search, Printer } from 'lucide-react'
 import { usePermisos } from '../hooks/usePermisos'
-import { supabase } from '../lib/supabase'
+import { siniestrosQuery } from '../lib/queries'
 
 const ESTADO_COLORS = {
   registrado: 'bg-gray-100 text-gray-700',
@@ -37,7 +37,7 @@ const ESTADO_LABELS = {
 
 const ESTADO_OPTIONS = [
   'registrado', 'cotizando', 'proforma_emitida', 'proforma_aprobada',
-  'en_reparacion', 'reparado', 'en_cobro', 'cerrado', 'anulado',
+  'en_reparacion', 'reparado', 'en_cobro', 'cerrado',
 ]
 
 export default function Siniestros() {
@@ -53,9 +53,7 @@ export default function Siniestros() {
 
   async function loadSiniestros() {
     setLoading(true)
-    let q = supabase
-      .from('siniestros')
-      .select('id,numero,fecha_dano,placa,cliente_nombre,tipo_dano,severidad,monto_cliente,estado,created_at')
+    let q = siniestrosQuery('id,numero,fecha_dano,placa,cliente_nombre,tipo_dano,severidad,monto_cliente,estado,created_at')
       .order('created_at', { ascending: false })
       .limit(200)
 

@@ -9,6 +9,9 @@ import { updateVehiculoStatus } from '../lib/odoo-api'
 import { useAuth } from '../hooks/useAuth'
 import { usePermisos } from '../hooks/usePermisos'
 import DocumentosSection from '../components/DocumentosSection'
+import ChecklistCierre from '../components/ChecklistCierre'
+import FechasTaller from '../components/FechasTaller'
+import HistorialCambios from '../components/HistorialCambios'
 
 // ── Constantes ────────────────────────────────────────────────
 
@@ -563,6 +566,31 @@ export default function ServicioDetalle() {
           </div>
         )}
 
+        {/* ── Fechas de taller ────────────────────────────────── */}
+        <FechasTaller
+          tabla="ordenes_servicio"
+          registroId={orden.id}
+          valores={{
+            fecha_entrega_taller:   orden.fecha_entrega_taller,
+            fecha_estimada_entrega: orden.fecha_estimada_entrega,
+            fecha_real_entrega:     orden.fecha_real_entrega,
+          }}
+          onUpdate={() => loadAll()}
+        />
+
+        {/* ── Checklist de cierre ─────────────────────────────── */}
+        {['completado'].includes(estado) && (
+          <ChecklistCierre
+            tabla="ordenes_servicio"
+            registroId={orden.id}
+            valores={{
+              tiene_prefactura: orden.tiene_prefactura,
+              tiene_proforma:   orden.tiene_proforma,
+              tiene_factura:    orden.tiene_factura,
+            }}
+          />
+        )}
+
         {/* ── Documentos ──────────────────────────────────────── */}
         <DocumentosSection
           origen="servicio"
@@ -606,6 +634,9 @@ export default function ServicioDetalle() {
             </ol>
           )}
         </div>
+
+        {/* ── Historial de cambios (audit_log) ─────────────────── */}
+        <HistorialCambios tabla="ordenes_servicio" filaId={orden.id} />
 
       </div>
     </>

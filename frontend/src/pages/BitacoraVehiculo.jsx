@@ -6,6 +6,7 @@ import {
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { fetchVehiculo } from '../lib/odoo-api'
+import { siniestrosQuery, ordenesServicioQuery } from '../lib/queries'
 import { usePermisos } from '../hooks/usePermisos'
 
 const SEVERIDAD_COLORS = {
@@ -74,12 +75,10 @@ export default function BitacoraVehiculo() {
       const placaUp = placa.toUpperCase()
       const [odooRes, sinRes, srvRes] = await Promise.all([
         fetchVehiculo(placaUp).catch(err => ({ _err: err.message })),
-        supabase.from('siniestros')
-          .select('id, numero, fecha_dano, tipo_dano, severidad, estado, descripcion, monto_cliente, costo_pass, margen, lugar_accidente')
+        siniestrosQuery('id, numero, fecha_dano, tipo_dano, severidad, estado, descripcion, monto_cliente, costo_pass, margen, lugar_accidente')
           .eq('placa', placaUp)
           .order('created_at', { ascending: false }),
-        supabase.from('ordenes_servicio')
-          .select('id, numero, fecha_programada, tipo_servicio, estado, total_general, kilometraje, descripcion, talleres(nombre)')
+        ordenesServicioQuery('id, numero, fecha_programada, tipo_servicio, estado, total_general, kilometraje, descripcion, talleres(nombre)')
           .eq('placa', placaUp)
           .order('created_at', { ascending: false }),
       ])
