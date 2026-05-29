@@ -12,15 +12,9 @@ import DocumentosSection from '../components/DocumentosSection'
 
 // ── Constantes ────────────────────────────────────────────────
 
-const ODOO_STATUS = {
-  servicio_menor:      'Servicios Varios',
-  servicio_mayor:      'En Mantenimiento',
-  cambio_llantas:      'Servicios Varios',
-  cambio_bateria:      'Servicios Varios',
-  alineacion_balanceo: 'Servicios Varios',
-  cambio_frenos:       'En Mantenimiento',
-  otro:                'Servicios Varios',
-}
+// Todos los servicios ponen el vehículo en "En Mantenimiento" al ingresar al taller.
+// (Plan F2/K — simplificación de status del vehículo a 3 valores)
+const STATUS_INGRESO_TALLER = 'En Mantenimiento'
 
 const TIPO_LABELS = {
   servicio_menor:      'Servicio menor',
@@ -154,7 +148,7 @@ export default function ServicioDetalle() {
           es_dano:           false,
         })
         if (orden.odoo_product_id) {
-          await updateVehiculoStatus(orden.odoo_product_id, ODOO_STATUS[orden.tipo_servicio] ?? 'Servicios Varios').catch(console.warn)
+          await updateVehiculoStatus(orden.odoo_product_id, STATUS_INGRESO_TALLER).catch(console.warn)
         }
       }
 
@@ -315,7 +309,7 @@ export default function ServicioDetalle() {
               <button
                 onClick={() => setConfirm({
                   titulo: 'Enviar a taller',
-                  mensaje: `El vehículo ${orden.placa} se marcará como "${ODOO_STATUS[orden.tipo_servicio]}" en Odoo.`,
+                  mensaje: `El vehículo ${orden.placa} se marcará como "${STATUS_INGRESO_TALLER}" en Odoo.`,
                   confirmLabel: 'Enviar',
                   onConfirm: () => ejecutar('en_proceso'),
                 })}
@@ -332,7 +326,7 @@ export default function ServicioDetalle() {
               <button
                 onClick={() => setConfirm({
                   titulo: 'Enviar a taller',
-                  mensaje: `El vehículo ${orden.placa} se marcará como "${ODOO_STATUS[orden.tipo_servicio]}" en Odoo.`,
+                  mensaje: `El vehículo ${orden.placa} se marcará como "${STATUS_INGRESO_TALLER}" en Odoo.`,
                   confirmLabel: 'Enviar',
                   onConfirm: () => ejecutar('en_proceso'),
                 })}
