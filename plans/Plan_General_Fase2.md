@@ -1,7 +1,8 @@
 # Plan General — Fase 2
 
 **Inicio**: 2026-05-28
-**Estado**: 📋 Planificada — pendiente de ejecución
+**Cierre**: 2026-05-28
+**Estado**: ✅ Completada en producción — ver [Plan_Cierre_Implementacion_Fase2.md](Plan_Cierre_Implementacion_Fase2.md)
 **Fase anterior**: [Plan_Cierre_Implementacion_Fase1.md](Plan_Cierre_Implementacion_Fase1.md)
 
 ---
@@ -14,19 +15,19 @@ Profundizar el control operacional del sistema: auditoría completa de todos los
 
 ## Subplanes de Fase 2
 
-| # | Tema | Subplan | Prioridad |
-|---|------|---------|-----------|
-| A | Auditoría + Roles granulares (crear/editar/ver/eliminar) | [Plan_F2_A_Auditoria_Roles.md](Plan_F2_A_Auditoria_Roles.md) | **Alta** |
-| B | Datos del cliente (Contrato + fix DPI/NIT/teléfono/correo) | [Plan_F2_B_Datos_Cliente.md](Plan_F2_B_Datos_Cliente.md) | Alta |
-| C | Cotizaciones — re-agregar proveedor y editar después de aprobar | [Plan_F2_C_Cotizaciones_Mejoradas.md](Plan_F2_C_Cotizaciones_Mejoradas.md) | Alta |
-| D | Catálogo Talleres — multi-contacto + puesto por área | [Plan_F2_D_Catalogo_Talleres.md](Plan_F2_D_Catalogo_Talleres.md) | Media |
-| E | Forma de pago en Daño (Cliente / PASS / Seguro) | [Plan_F2_E_Forma_Pago_Dano.md](Plan_F2_E_Forma_Pago_Dano.md) | Media |
-| F | Tipos de servicio adicionales (6 nuevos) | [Plan_F2_F_Tipos_Servicio.md](Plan_F2_F_Tipos_Servicio.md) | Baja |
-| G | Fechas adicionales (Fecha Entrega Taller, etc.) | [Plan_F2_G_Fechas_Adicionales.md](Plan_F2_G_Fechas_Adicionales.md) | Media |
-| H | Anulados invisibles para usuarios | [Plan_F2_H_Anulados_Invisibles.md](Plan_F2_H_Anulados_Invisibles.md) | Baja |
-| I | Descuento en líneas de detalle | [Plan_F2_I_Descuento_Lineas.md](Plan_F2_I_Descuento_Lineas.md) | Media |
-| J | Checklist de documentos al cierre (Prefactura/Proforma/Factura) | [Plan_F2_J_Checklist_Documentos.md](Plan_F2_J_Checklist_Documentos.md) | Alta |
-| K | Simplificar `x_studio_status_vehiculo` a 3 valores (Disponible / En Mantenimiento / En Reparación) | [Plan_F2_K_Status_Vehiculo_Odoo.md](Plan_F2_K_Status_Vehiculo_Odoo.md) | Media |
+| # | Tema | Subplan | Status |
+|---|------|---------|--------|
+| A | Auditoría + Roles granulares (crear/editar/ver/eliminar) | [Plan_F2_A_Auditoria_Roles.md](Plan_F2_A_Auditoria_Roles.md) | ✅ |
+| B | Datos del cliente (Contrato + fix DPI/NIT/teléfono/correo) | [Plan_F2_B_Datos_Cliente.md](Plan_F2_B_Datos_Cliente.md) | ✅ |
+| C | Cotizaciones — re-agregar proveedor y editar después de aprobar | [Plan_F2_C_Cotizaciones_Mejoradas.md](Plan_F2_C_Cotizaciones_Mejoradas.md) | ✅ |
+| D | Catálogo Talleres — multi-contacto + puesto por área | [Plan_F2_D_Catalogo_Talleres.md](Plan_F2_D_Catalogo_Talleres.md) | ✅ |
+| E | Forma de pago en Daño (Cliente / PASS / Seguro) | [Plan_F2_E_Forma_Pago_Dano.md](Plan_F2_E_Forma_Pago_Dano.md) | ✅ |
+| F | Tipos de servicio adicionales (6 nuevos) | [Plan_F2_F_Tipos_Servicio.md](Plan_F2_F_Tipos_Servicio.md) | ✅ |
+| G | Fechas adicionales (Fecha Entrega Taller, etc.) | [Plan_F2_G_Fechas_Adicionales.md](Plan_F2_G_Fechas_Adicionales.md) | ✅ |
+| H | Anulados invisibles para usuarios | [Plan_F2_H_Anulados_Invisibles.md](Plan_F2_H_Anulados_Invisibles.md) | ✅ |
+| I | Descuento en líneas de detalle | [Plan_F2_I_Descuento_Lineas.md](Plan_F2_I_Descuento_Lineas.md) | ✅ |
+| J | Checklist de documentos al cierre (Prefactura/Proforma/Factura) | [Plan_F2_J_Checklist_Documentos.md](Plan_F2_J_Checklist_Documentos.md) | ✅ |
+| K | Simplificar `x_studio_status_vehiculo` a 3 valores (Disponible / En Mantenimiento / En Reparación) | [Plan_F2_K_Status_Vehiculo_Odoo.md](Plan_F2_K_Status_Vehiculo_Odoo.md) | ✅ |
 
 ---
 

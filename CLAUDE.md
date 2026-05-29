@@ -3,8 +3,12 @@
 ## Estado del proyecto
 
 - **Fase 1**: ✅ Completada — en producción
-- **Fase 2**: 📋 Planificada — ver [plans/Plan_General_Fase2.md](plans/Plan_General_Fase2.md)
-- Cierre de Fase 1: ver [plans/Plan_Cierre_Implementacion_Fase1.md](plans/Plan_Cierre_Implementacion_Fase1.md)
+  - Cierre: [plans/Plan_Cierre_Implementacion_Fase1.md](plans/Plan_Cierre_Implementacion_Fase1.md)
+- **Fase 2**: ✅ Completada — en producción
+  - Cierre: [plans/Plan_Cierre_Implementacion_Fase2.md](plans/Plan_Cierre_Implementacion_Fase2.md)
+  - Plan general: [plans/Plan_General_Fase2.md](plans/Plan_General_Fase2.md)
+  - 11 subplanes ejecutados (A–K)
+- **Fase 3**: No planificada actualmente
 
 ## Proyecto
 
@@ -835,17 +839,73 @@ Para que `supabase.auth.setSession(jwt)` acepte tokens firmados por nuestro back
 
 ---
 
-## Roadmap Fase 2
+## Características agregadas en Fase 2
 
-Ver [plans/Plan_General_Fase2.md](plans/Plan_General_Fase2.md). Incluye:
-- Auditoría granular + Roles por permiso (crear/editar/ver/eliminar)
-- Datos del cliente (fix + extensión)
-- Cotizaciones repetibles por taller con variantes (Original/Genérico)
-- Edición de cotizaciones aprobadas
-- Multi-contacto en talleres con área (7 categorías)
-- Forma de pago en daño (Cliente/PASS/Seguro)
-- 6 tipos de servicio adicionales
-- Fechas adicionales (entrega taller, estimada/real finalización)
-- Anulados invisibles para usuarios
-- Descuento en líneas de detalle
-- Checklist de cierre (Prefactura/Proforma/Factura)
+Ver detalles completos en [plans/Plan_Cierre_Implementacion_Fase2.md](plans/Plan_Cierre_Implementacion_Fase2.md).
+
+### Auditoría
+- Tabla `audit_log` con función `audit_changes()` aplicada a 10 tablas operacionales
+- Componente `HistorialCambios` colapsable en detalles
+- Cada cambio queda registrado con `usuario_id` + `usuario_email` + timestamp + campo modificado + valor anterior/nuevo
+
+### Roles granulares
+- `perfiles.permisos JSONB` con flags `{ crear, editar, ver, eliminar }`
+- Hook `usePermisos` que envuelve los flags
+- Página `/usuarios` (solo admin) con 4 presets y editor granular
+- Función SQL `has_permission(text)` reemplaza policies basadas en `rol`
+- Default al crear via SSO: solo lectura
+
+### Cotizaciones avanzadas
+- Soporte de `variante` en `cotizaciones` (Original, Genérico, etc.)
+- Panel de solicitar con filas múltiples taller+variante
+- Mismo taller puede aparecer N veces con variantes distintas
+- Edición de líneas tras aprobada — trigger `sync_costo_pass_from_approved_quote` sincroniza siniestros.costo_pass automáticamente
+
+### Talleres multi-contacto
+- Nueva tabla `taller_contactos` con enum `area_contacto` (7 áreas)
+- Máximo 3 contactos activos por taller (trigger `limit_taller_contactos`)
+- 1 contacto principal por taller (trigger `unique_taller_principal`)
+- Componente `TallerContactosEditor` embebido en modal de Catálogos
+
+### Forma de pago
+- Enum `forma_pago_dano` (cliente, pass, seguro)
+- Radio cards en wizard de daño (paso 3, después de descripción)
+- Badge en detalle del daño y ficha imprimible
+
+### 6 nuevos tipos de servicio
+revision_general, enderezado_pintura (req auth), reposicion_llave, sistema_electrico, revision_ac, revision_inyeccion
+
+### 3 fechas adicionales de taller
+- `fecha_entrega_taller`, `fecha_estimada_entrega`, `fecha_real_entrega`
+- Componente `FechasTaller` editable con semáforo verde/ámbar/rojo según retraso
+
+### Anulados invisibles
+- Helpers centralizados `siniestrosQuery()` y `ordenesServicioQuery()` en `lib/queries.js`
+- Filtro aplicado a Dashboard, Lista Daños/Servicios, Bitácora, Drawer Flota, Proformas
+- Detalle accesible vía URL directa (auditoría preservada)
+
+### Descuento como tipo de línea
+- Valor `descuento` agregado al enum `tipo_linea_cotizacion`
+- Monto ingresado MANUALMENTE con signo negativo
+- Columna `total_descuentos` separada en breakdown
+- Triggers `actualizar_totales_*` recalculan correctamente
+
+### Checklist manual de documentos
+- 3 booleanos por registro (`tiene_prefactura`, `tiene_proforma`, `tiene_factura`)
+- Componente `ChecklistCierre` con feedback visual (verde/ámbar)
+- Marcado MANUAL — no se detectan uploads automáticamente
+- Solo warning visual, no bloquea cierre
+
+### Status vehículo simplificado
+- TODOS los servicios ponen el vehículo en "En Mantenimiento" al ingresar
+- Daños → "En Reparación"
+- Egreso → "Disponible"
+- Eliminada lógica condicional por tipo
+
+### Fichas imprimibles enriquecidas
+Ambas fichas (daño y servicio) ahora incluyen:
+- Forma de pago (solo daño)
+- Fechas de taller (3)
+- Checklist de documentos
+- Descuentos en breakdown de proforma
+- Variante en encabezado de proforma
