@@ -7,6 +7,7 @@ import {
 import { supabase } from '../lib/supabase'
 import { updateVehiculoStatus } from '../lib/odoo-api'
 import { useAuth } from '../hooks/useAuth'
+import { usePermisos } from '../hooks/usePermisos'
 import DocumentosSection from '../components/DocumentosSection'
 
 // ── Constantes ────────────────────────────────────────────────
@@ -98,6 +99,7 @@ export default function ServicioDetalle() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { perfil } = useAuth()
+  const { puedeCrear, puedeEditar, puedeEliminar } = usePermisos()
 
   const [orden, setOrden]                 = useState(null)
   const [lineas, setLineas]               = useState([])
@@ -109,7 +111,6 @@ export default function ServicioDetalle() {
   const [nuevaLinea, setNuevaLinea]       = useState({ ...LINEA_VACIA })
   const [autorizadoPor, setAutorizadoPor] = useState('')
 
-  const esAdmin = ['admin', 'agente_senior'].includes(perfil?.rol)
 
   useEffect(() => { loadAll() }, [id])
 
@@ -285,7 +286,7 @@ export default function ServicioDetalle() {
           <div className="flex items-center gap-2 flex-wrap justify-end shrink-0">
 
             {/* programado + requiere_autorizacion → Autorizar */}
-            {estado === 'programado' && orden.requiere_autorizacion && (
+            {puedeEditar && estado === 'programado' && orden.requiere_autorizacion && (
               <button
                 onClick={() => setConfirm({
                   titulo: 'Autorizar orden de servicio',
@@ -310,7 +311,7 @@ export default function ServicioDetalle() {
             )}
 
             {/* programado sin auth → Enviar a taller */}
-            {estado === 'programado' && !orden.requiere_autorizacion && (
+            {puedeEditar && estado === 'programado' && !orden.requiere_autorizacion && (
               <button
                 onClick={() => setConfirm({
                   titulo: 'Enviar a taller',
@@ -327,7 +328,7 @@ export default function ServicioDetalle() {
             )}
 
             {/* aprobado → Enviar a taller */}
-            {estado === 'aprobado' && (
+            {puedeEditar && estado === 'aprobado' && (
               <button
                 onClick={() => setConfirm({
                   titulo: 'Enviar a taller',
@@ -344,7 +345,7 @@ export default function ServicioDetalle() {
             )}
 
             {/* en_proceso → Completar */}
-            {estado === 'en_proceso' && (
+            {puedeEditar && estado === 'en_proceso' && (
               <button
                 onClick={() => setConfirm({
                   titulo: 'Completar servicio',
@@ -369,8 +370,8 @@ export default function ServicioDetalle() {
               Imprimir
             </button>
 
-            {/* Cancelar — admin, estados activos */}
-            {esAdmin && !bloqueada && (
+            {/* Cancelar — solo con permiso de eliminar, estados activos */}
+            {puedeEliminar && !bloqueada && (
               <button
                 onClick={() => setConfirm({
                   titulo: 'Cancelar orden',
@@ -436,7 +437,7 @@ export default function ServicioDetalle() {
                       <td className="py-2 pr-2 text-right text-gray-600">{l.cantidad}</td>
                       <td className="py-2 pr-2 text-right text-gray-600">{fmt(l.precio_unitario)}</td>
                       <td className="py-2 text-right font-medium text-gray-800">{fmt(l.subtotal)}</td>
-                      {!bloqueada && (
+                      {!bloqueada && puedeEliminar && (
                         <td className="py-2 pl-2">
                           <button onClick={() => handleDeleteLinea(l.id)} className="text-gray-300 hover:text-red-500">
                             <Trash2 size={13} />
@@ -474,7 +475,7 @@ export default function ServicioDetalle() {
           )}
 
           {/* Agregar línea */}
-          {!bloqueada && (
+          {!bloqueada && puedeCrear && (
             <div className="border-t border-dashed border-gray-200 pt-3 space-y-2">
               <p className="text-xs text-gray-400 font-medium">+ Agregar línea</p>
               <div className="grid grid-cols-12 gap-1.5 items-center">

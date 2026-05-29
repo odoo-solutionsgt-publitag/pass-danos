@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import DocumentosSection from './DocumentosSection'
+import { usePermisos } from '../hooks/usePermisos'
 
 const TIPO_LABELS = { repuesto: 'Repuesto', mano_obra: 'Mano de obra', otro: 'Otro' }
 
@@ -9,6 +10,7 @@ function fmt(n) {
 }
 
 export default function ProformaSection({ siniestro, onUpdate }) {
+  const { puedeEditar } = usePermisos()
   const [cotizacion, setCotizacion] = useState(null)
   const [montoCliente, setMontoCliente] = useState('')
   const [loading, setLoading] = useState(true)
@@ -123,18 +125,21 @@ export default function ProformaSection({ siniestro, onUpdate }) {
             onChange={e => setMontoCliente(e.target.value)}
             min="0"
             step="0.01"
-            className="flex-1 border border-blue-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400 font-mono"
+            readOnly={!puedeEditar}
+            className={`flex-1 border border-blue-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400 font-mono ${!puedeEditar ? 'bg-gray-50 cursor-not-allowed' : ''}`}
             placeholder="0.00"
           />
-          <button
-            onClick={handleSaveMonto}
-            disabled={saving}
-            className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-              saved ? 'bg-green-600 text-white' : 'bg-blue-600 hover:bg-blue-700 text-white'
-            } disabled:opacity-50`}
-          >
-            {saved ? '✓ Guardado' : saving ? 'Guardando...' : 'Guardar'}
-          </button>
+          {puedeEditar && (
+            <button
+              onClick={handleSaveMonto}
+              disabled={saving}
+              className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                saved ? 'bg-green-600 text-white' : 'bg-blue-600 hover:bg-blue-700 text-white'
+              } disabled:opacity-50`}
+            >
+              {saved ? '✓ Guardado' : saving ? 'Guardando...' : 'Guardar'}
+            </button>
+          )}
         </div>
 
         {/* Resumen financiero */}

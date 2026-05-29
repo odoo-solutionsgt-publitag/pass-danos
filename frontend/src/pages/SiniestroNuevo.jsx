@@ -4,6 +4,7 @@ import { ArrowLeft, ArrowRight, Check, Search, FileText, Car, Building2, X } fro
 import { supabase } from '../lib/supabase'
 import { fetchVehiculos, fetchVehiculo, buscarContratos, fetchContratoById, syncBitacora } from '../lib/odoo-api'
 import { useAuth } from '../hooks/useAuth'
+import { usePermisos } from '../hooks/usePermisos'
 
 const TIPOS_DANO = [
   { value: 'choque_frontal', label: 'Choque frontal' },
@@ -30,6 +31,14 @@ const STEPS = ['Vehículo', 'Cliente', 'Daño']
 export default function SiniestroNuevo() {
   const navigate = useNavigate()
   const { user } = useAuth()
+  const { puedeCrear, loading: permLoading } = usePermisos()
+
+  useEffect(() => {
+    if (!permLoading && !puedeCrear) {
+      navigate('/siniestros', { replace: true })
+    }
+  }, [permLoading, puedeCrear, navigate])
+
   const [step, setStep] = useState(0)
   const [busquedaTipo, setBusquedaTipo] = useState('contrato')
 

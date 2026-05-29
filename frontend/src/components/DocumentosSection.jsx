@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { Upload, Download, Trash2, FileText, FileImage, FileSpreadsheet, File as FileIcon, X, AlertCircle, CheckCircle2, FolderOpen } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
+import { usePermisos } from '../hooks/usePermisos'
 
 const TIPO_LABELS = {
   cotizacion_pdf:    'Cotización',
@@ -46,6 +47,7 @@ const MAX_BYTES = 10 * 1024 * 1024
  */
 export default function DocumentosSection({ origen, origenId, numero, cotizacionId, tiposSugeridos, titulo = 'Documentos' }) {
   const { user } = useAuth()
+  const { puedeCrear, puedeEliminar } = usePermisos()
   const [docs, setDocs]       = useState([])
   const [loading, setLoading] = useState(true)
   const [uploadOpen, setUploadOpen] = useState(false)
@@ -91,13 +93,15 @@ export default function DocumentosSection({ origen, origenId, numero, cotizacion
           <h3 className="text-sm font-semibold text-gray-800">{titulo}</h3>
           {docs.length > 0 && <span className="text-xs text-gray-400">({docs.length})</span>}
         </div>
-        <button
-          onClick={() => setUploadOpen(true)}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 border border-red-200 rounded-lg"
-        >
-          <Upload size={13} />
-          Subir documento
-        </button>
+        {puedeCrear && (
+          <button
+            onClick={() => setUploadOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 border border-red-200 rounded-lg"
+          >
+            <Upload size={13} />
+            Subir documento
+          </button>
+        )}
       </div>
 
       {loading ? (
@@ -134,13 +138,15 @@ export default function DocumentosSection({ origen, origenId, numero, cotizacion
               >
                 <Download size={14} />
               </button>
-              <button
-                onClick={() => eliminar(d)}
-                className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded"
-                title="Eliminar"
-              >
-                <Trash2 size={14} />
-              </button>
+              {puedeEliminar && (
+                <button
+                  onClick={() => eliminar(d)}
+                  className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded"
+                  title="Eliminar"
+                >
+                  <Trash2 size={14} />
+                </button>
+              )}
             </li>
           ))}
         </ul>

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Plus, Search, Pencil, X, Save, Wrench, Package, AlertCircle, CheckCircle2 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
-import { useAuth } from '../hooks/useAuth'
+import { usePermisos } from '../hooks/usePermisos'
 
 const TABS = [
   { key: 'talleres', label: 'Talleres', icon: Wrench },
@@ -9,10 +9,10 @@ const TABS = [
 ]
 
 export default function Catalogos() {
-  const { perfil } = useAuth()
+  const { puedeCrear, puedeEditar } = usePermisos()
   const [tab, setTab] = useState('talleres')
 
-  const esAdmin = perfil?.rol === 'admin' || perfil?.rol === 'agente_senior'
+  const esAdmin = puedeCrear || puedeEditar
 
   return (
     <div className="space-y-5">

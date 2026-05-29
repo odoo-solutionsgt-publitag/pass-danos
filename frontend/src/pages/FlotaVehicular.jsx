@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { RefreshCw, Search, X, Car, Calendar, User, Phone, Mail, FileText, AlertCircle } from 'lucide-react'
 import { fetchVehiculos, fetchVehiculo } from '../lib/odoo-api'
 import { supabase } from '../lib/supabase'
+import { usePermisos } from '../hooks/usePermisos'
 
 const STATUS_COLORS = {
   'Disponible':            { card: 'bg-green-50 border-green-200',  badge: 'bg-green-100 text-green-700 border-green-200',  dot: 'bg-green-500'  },
@@ -242,6 +243,7 @@ export default function FlotaVehicular() {
 
 function VehiculoDrawer({ vehiculo, onClose }) {
   const navigate = useNavigate()
+  const { puedeCrear } = usePermisos()
   const [detalle, setDetalle]     = useState(null)
   const [siniestros, setSinies]   = useState([])
   const [servicios, setServicios] = useState([])
@@ -424,20 +426,22 @@ function VehiculoDrawer({ vehiculo, onClose }) {
             >
               <FileText size={14} /> Ver bitácora completa
             </button>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                onClick={() => { onClose(); navigate('/siniestros/nuevo', { state: { placa: vehiculo.placa } }) }}
-                className="text-sm bg-red-600 hover:bg-red-700 text-white font-medium py-2 rounded-lg"
-              >
-                + Daño
-              </button>
-              <button
-                onClick={() => { onClose(); navigate('/servicios/nuevo', { state: { placa: vehiculo.placa } }) }}
-                className="text-sm bg-gray-900 hover:bg-gray-800 text-white font-medium py-2 rounded-lg"
-              >
-                + Servicio
-              </button>
-            </div>
+            {puedeCrear && (
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => { onClose(); navigate('/siniestros/nuevo', { state: { placa: vehiculo.placa } }) }}
+                  className="text-sm bg-red-600 hover:bg-red-700 text-white font-medium py-2 rounded-lg"
+                >
+                  + Daño
+                </button>
+                <button
+                  onClick={() => { onClose(); navigate('/servicios/nuevo', { state: { placa: vehiculo.placa } }) }}
+                  className="text-sm bg-gray-900 hover:bg-gray-800 text-white font-medium py-2 rounded-lg"
+                >
+                  + Servicio
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>

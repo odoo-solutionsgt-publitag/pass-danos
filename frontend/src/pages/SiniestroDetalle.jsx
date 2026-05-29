@@ -7,6 +7,7 @@ import {
 import { supabase } from '../lib/supabase'
 import { updateVehiculoStatus } from '../lib/odoo-api'
 import { useAuth } from '../hooks/useAuth'
+import { usePermisos } from '../hooks/usePermisos'
 import CotizacionesSection from '../components/CotizacionesSection'
 import ProformaSection from '../components/ProformaSection'
 import DocumentosSection from '../components/DocumentosSection'
@@ -127,6 +128,7 @@ export default function SiniestroDetalle() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { perfil } = useAuth()
+  const { puedeEditar, puedeEliminar } = usePermisos()
 
   const [siniestro, setSiniestro] = useState(null)
   const [timeline, setTimeline] = useState([])
@@ -135,7 +137,6 @@ export default function SiniestroDetalle() {
   const [saving, setSaving] = useState(false)
   const [confirm, setConfirm] = useState(null)
 
-  const esAdminOSenior = ['admin', 'agente_senior'].includes(perfil?.rol)
 
   useEffect(() => { loadAll() }, [id])
 
@@ -276,7 +277,7 @@ export default function SiniestroDetalle() {
 
           {/* Botones de acción */}
           <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
-            {estado === 'registrado' && (
+            {puedeEditar && estado === 'registrado' && (
               <button
                 onClick={() => pedirConfirm({
                   titulo: 'Solicitar cotizaciones',
@@ -296,7 +297,7 @@ export default function SiniestroDetalle() {
               <span className="text-sm text-gray-400 italic">Gestión en sección de cotizaciones</span>
             )}
 
-            {estado === 'proforma_emitida' && (
+            {puedeEditar && estado === 'proforma_emitida' && (
               <button
                 onClick={() => pedirConfirm({
                   titulo: 'Aprobar proforma',
@@ -312,7 +313,7 @@ export default function SiniestroDetalle() {
               </button>
             )}
 
-            {estado === 'proforma_aprobada' && (
+            {puedeEditar && estado === 'proforma_aprobada' && (
               <button
                 onClick={() => pedirConfirm({
                   titulo: 'Ingresar a taller',
@@ -328,7 +329,7 @@ export default function SiniestroDetalle() {
               </button>
             )}
 
-            {estado === 'en_reparacion' && (
+            {puedeEditar && estado === 'en_reparacion' && (
               <button
                 onClick={() => pedirConfirm({
                   titulo: 'Marcar como reparado',
@@ -344,7 +345,7 @@ export default function SiniestroDetalle() {
               </button>
             )}
 
-            {estado === 'reparado' && (
+            {puedeEditar && estado === 'reparado' && (
               <>
                 <button
                   onClick={() => pedirConfirm({
@@ -386,7 +387,7 @@ export default function SiniestroDetalle() {
               </>
             )}
 
-            {estado === 'en_cobro' && (
+            {puedeEditar && estado === 'en_cobro' && (
               <button
                 onClick={() => pedirConfirm({
                   titulo: 'Cerrar expediente',
@@ -411,8 +412,8 @@ export default function SiniestroDetalle() {
               Imprimir
             </button>
 
-            {/* Anular — solo admin/agente_senior, en estados activos */}
-            {esAdminOSenior && !['cerrado', 'anulado'].includes(estado) && (
+            {/* Anular — solo usuarios con permiso de eliminar, en estados activos */}
+            {puedeEliminar && !['cerrado', 'anulado'].includes(estado) && (
               <button
                 onClick={() => pedirConfirm({
                   titulo: 'Anular expediente',

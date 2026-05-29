@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Plus, Search, Printer } from 'lucide-react'
+import { usePermisos } from '../hooks/usePermisos'
 import { supabase } from '../lib/supabase'
 
 const ESTADO_COLORS = {
@@ -41,6 +42,7 @@ const ESTADO_OPTIONS = [
 
 export default function Siniestros() {
   const navigate = useNavigate()
+  const { puedeCrear } = usePermisos()
   const [siniestros, setSiniestros] = useState([])
   const [loading, setLoading] = useState(true)
   const [busqueda, setBusqueda] = useState('')
@@ -92,13 +94,15 @@ export default function Siniestros() {
           <h1 className="text-xl font-bold text-gray-900">Daños</h1>
           <p className="text-sm text-gray-500">{filtrados.length} registros</p>
         </div>
-        <button
-          onClick={() => navigate('/siniestros/nuevo')}
-          className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
-        >
-          <Plus size={16} />
-          Registrar daño
-        </button>
+        {puedeCrear && (
+          <button
+            onClick={() => navigate('/siniestros/nuevo')}
+            className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+          >
+            <Plus size={16} />
+            Registrar daño
+          </button>
+        )}
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 flex flex-wrap gap-3">

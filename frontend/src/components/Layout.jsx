@@ -2,10 +2,12 @@ import { useState } from 'react'
 import { Outlet, useNavigate } from 'react-router-dom'
 import { Menu, Plus, Wrench } from 'lucide-react'
 import Sidebar from './Sidebar'
+import { usePermisos } from '../hooks/usePermisos'
 
 export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const navigate = useNavigate()
+  const { puedeCrear } = usePermisos()
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-100">
@@ -21,24 +23,26 @@ export default function Layout() {
           </button>
           <div className="hidden lg:block" />
 
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => navigate('/servicios/nuevo')}
-              className="flex items-center gap-2 bg-slate-800 hover:bg-slate-900 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
-              title="Crear nueva orden de servicio (mantenimiento)"
-            >
-              <Wrench size={15} />
-              Nueva orden
-            </button>
-            <button
-              onClick={() => navigate('/siniestros/nuevo')}
-              className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
-              title="Registrar un nuevo daño"
-            >
-              <Plus size={16} />
-              Nuevo Daño
-            </button>
-          </div>
+          {puedeCrear && (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => navigate('/servicios/nuevo')}
+                className="flex items-center gap-2 bg-slate-800 hover:bg-slate-900 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+                title="Crear nueva orden de servicio (mantenimiento)"
+              >
+                <Wrench size={15} />
+                Nueva orden
+              </button>
+              <button
+                onClick={() => navigate('/siniestros/nuevo')}
+                className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+                title="Registrar un nuevo daño"
+              >
+                <Plus size={16} />
+                Nuevo Daño
+              </button>
+            </div>
+          )}
         </header>
 
         <main className="flex-1 overflow-y-auto p-4 lg:p-6">

@@ -6,6 +6,7 @@ import {
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { fetchVehiculo } from '../lib/odoo-api'
+import { usePermisos } from '../hooks/usePermisos'
 
 const SEVERIDAD_COLORS = {
   leve:          'bg-green-100 text-green-700',
@@ -54,6 +55,7 @@ function formatDate(iso) {
 export default function BitacoraVehiculo() {
   const { placa } = useParams()
   const navigate = useNavigate()
+  const { puedeCrear } = usePermisos()
 
   const [odooData, setOdooData] = useState(null)
   const [siniestros, setSinies] = useState([])
@@ -225,18 +227,22 @@ export default function BitacoraVehiculo() {
 
       {/* Acciones rápidas */}
       <div className="flex gap-2 flex-wrap">
-        <button
-          onClick={() => navigate('/siniestros/nuevo')}
-          className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium px-4 py-2 rounded-lg"
-        >
-          <Plus size={15} /> Registrar daño
-        </button>
-        <button
-          onClick={() => navigate('/servicios/nuevo')}
-          className="flex items-center gap-2 bg-slate-800 hover:bg-slate-900 text-white text-sm font-medium px-4 py-2 rounded-lg"
-        >
-          <Wrench size={15} /> Nueva orden
-        </button>
+        {puedeCrear && (
+          <>
+            <button
+              onClick={() => navigate('/siniestros/nuevo')}
+              className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium px-4 py-2 rounded-lg"
+            >
+              <Plus size={15} /> Registrar daño
+            </button>
+            <button
+              onClick={() => navigate('/servicios/nuevo')}
+              className="flex items-center gap-2 bg-slate-800 hover:bg-slate-900 text-white text-sm font-medium px-4 py-2 rounded-lg"
+            >
+              <Wrench size={15} /> Nueva orden
+            </button>
+          </>
+        )}
         <button
           onClick={() => window.print()}
           className="flex items-center gap-2 border border-gray-200 text-gray-600 hover:bg-gray-50 text-sm font-medium px-4 py-2 rounded-lg"

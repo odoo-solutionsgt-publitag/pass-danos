@@ -4,6 +4,7 @@ import { ArrowLeft, Search, X, Plus, Trash2, AlertTriangle } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { fetchVehiculos, syncBitacora } from '../lib/odoo-api'
 import { useAuth } from '../hooks/useAuth'
+import { usePermisos } from '../hooks/usePermisos'
 
 const TIPOS_SERVICIO = [
   { value: 'servicio_menor',      label: 'Servicio menor',        requiereAuth: false },
@@ -26,6 +27,13 @@ function calcTotal(lineas) {
 export default function ServicioNuevo() {
   const navigate = useNavigate()
   const { user } = useAuth()
+  const { puedeCrear, loading: permLoading } = usePermisos()
+
+  useEffect(() => {
+    if (!permLoading && !puedeCrear) {
+      navigate('/servicios', { replace: true })
+    }
+  }, [permLoading, puedeCrear, navigate])
 
   // Vehículo
   const [vehiculos, setVehiculos]           = useState([])

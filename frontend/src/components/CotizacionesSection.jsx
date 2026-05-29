@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Plus, Trash2, Check } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import DocumentosSection from './DocumentosSection'
+import { usePermisos } from '../hooks/usePermisos'
 
 const TIPO_LABELS = { repuesto: 'Repuesto', mano_obra: 'Mano de obra', otro: 'Otro' }
 
@@ -26,6 +27,7 @@ function fmt(n) {
 const LINEA_VACIA = { tipo: 'repuesto', descripcion: '', cantidad: '1', precio_unitario: '' }
 
 export default function CotizacionesSection({ siniestro, onUpdate }) {
+  const { puedeCrear, puedeEditar, puedeEliminar } = usePermisos()
   const [cotizaciones, setCotizaciones] = useState([])
   const [talleres, setTalleres]         = useState([])
   const [loading, setLoading]           = useState(true)
@@ -161,7 +163,7 @@ export default function CotizacionesSection({ siniestro, onUpdate }) {
       {/* Header */}
       <div className="flex items-center justify-between">
         <h4 className="text-sm font-semibold text-gray-700">Cotizaciones</h4>
-        {!hayAprobada && cotizaciones.length < 3 && talleresLibres.length > 0 && (
+        {puedeCrear && !hayAprobada && cotizaciones.length < 3 && talleresLibres.length > 0 && (
           <button
             onClick={() => setShowSolicitar(s => !s)}
             className="flex items-center gap-1.5 text-xs px-3 py-1.5 border border-red-200 text-red-600 rounded-lg hover:bg-red-50"
@@ -241,7 +243,7 @@ export default function CotizacionesSection({ siniestro, onUpdate }) {
                   {ESTADO_COT_LABELS[cot.estado]}
                 </span>
               </div>
-              {!bloqueada && lineas.length > 0 && (
+              {puedeEditar && !bloqueada && lineas.length > 0 && (
                 <button
                   onClick={() => handleAprobar(cot.id, cot.taller_id)}
                   disabled={saving}
@@ -279,7 +281,7 @@ export default function CotizacionesSection({ siniestro, onUpdate }) {
                         <td className="py-1.5 pr-2 text-right text-gray-600">{l.cantidad}</td>
                         <td className="py-1.5 pr-2 text-right text-gray-600">{fmt(l.precio_unitario)}</td>
                         <td className="py-1.5 text-right font-medium text-gray-800">{fmt(l.subtotal)}</td>
-                        {!bloqueada && (
+                        {!bloqueada && puedeEliminar && (
                           <td className="py-1.5 pl-2">
                             <button
                               onClick={() => handleDeleteLinea(l.id)}
@@ -316,7 +318,7 @@ export default function CotizacionesSection({ siniestro, onUpdate }) {
               )}
 
               {/* Agregar línea */}
-              {!bloqueada && (
+              {!bloqueada && puedeCrear && (
                 <div className="border-t border-dashed border-gray-200 pt-3">
                   <p className="text-xs text-gray-400 mb-2 font-medium">+ Agregar línea</p>
                   <div className="grid grid-cols-12 gap-1.5 items-center">
