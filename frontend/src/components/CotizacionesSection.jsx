@@ -3,6 +3,7 @@ import { Plus, Trash2, Check, X, AlertTriangle } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import DocumentosSection from './DocumentosSection'
 import { usePermisos } from '../hooks/usePermisos'
+import { colorPorIndice } from '../lib/colores'
 
 const TIPO_LABELS = { repuesto: 'Repuesto', mano_obra: 'Mano de obra', otro: 'Otro', descuento: 'Descuento' }
 
@@ -260,27 +261,28 @@ export default function CotizacionesSection({ siniestro, onUpdate }) {
       )}
 
       {/* Tarjeta por cotización */}
-      {cotizaciones.map(cot => {
+      {cotizaciones.map((cot, idx) => {
         const nl       = newLineas[cot.id] ?? LINEA_VACIA
         const lineas   = cot.cotizacion_lineas ?? []
         // Solo se bloquea cuando está rechazada. Aprobada SÍ se puede editar
         // (los cambios sincronizan automáticamente siniestros.costo_pass vía trigger SQL).
         const bloqueada = cot.estado === 'rechazada'
         const editableAprobada = cot.estado === 'aprobada'
+        const color = colorPorIndice(idx)
 
         return (
           <div
             key={cot.id}
-            className={`border rounded-xl overflow-hidden ${
-              cot.estado === 'aprobada' ? 'border-green-300' :
-              cot.estado === 'rechazada' ? 'border-gray-200 opacity-60' :
-              'border-gray-200'
-            }`}
+            style={{ backgroundColor: color.bg, borderColor: cot.estado === 'aprobada' ? '#86efac' : color.border }}
+            className={`border-2 rounded-xl overflow-hidden ${cot.estado === 'rechazada' ? 'opacity-60' : ''}`}
           >
             {/* Encabezado */}
-            <div className={`flex items-center justify-between px-4 py-3 ${cot.estado === 'aprobada' ? 'bg-green-50' : 'bg-gray-50'}`}>
+            <div
+              className="flex items-center justify-between px-4 py-3"
+              style={{ borderBottom: `1px solid ${color.border}` }}
+            >
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-sm font-semibold text-gray-800">{cot.talleres?.nombre}</span>
+                <span className="text-sm font-semibold" style={{ color: color.textHeader }}>{cot.talleres?.nombre}</span>
                 {cot.variante && (
                   <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-indigo-100 text-indigo-700">
                     {cot.variante}
@@ -452,11 +454,14 @@ export default function CotizacionesSection({ siniestro, onUpdate }) {
                 <tr className="text-left border-b border-gray-100">
                   <th className="px-4 py-3 text-xs text-gray-500 font-medium">Concepto</th>
                   {cotsConLineas.map(c => {
+                    const idxOrig = cotizaciones.findIndex(x => x.id === c.id)
+                    const colorCol = colorPorIndice(idxOrig)
                     const esMenor = Number(c.total_general) === minTotal
                     return (
                       <th
                         key={c.id}
-                        className={`px-4 py-3 text-xs font-semibold text-center ${esMenor ? 'text-green-700 bg-green-50' : 'text-gray-700'}`}
+                        style={!esMenor ? { backgroundColor: colorCol.bg, color: colorCol.textHeader } : undefined}
+                        className={`px-4 py-3 text-xs font-semibold text-center ${esMenor ? 'text-green-700 bg-green-50' : ''}`}
                       >
                         <div>{c.talleres?.nombre}{esMenor && <span className="ml-1">★</span>}</div>
                         {c.variante && <div className="text-[10px] font-normal text-indigo-600 mt-0.5">{c.variante}</div>}
