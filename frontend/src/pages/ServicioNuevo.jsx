@@ -13,6 +13,12 @@ const TIPOS_SERVICIO = [
   { value: 'cambio_bateria',      label: 'Cambio de batería',     requiereAuth: false },
   { value: 'alineacion_balanceo', label: 'Alineación / balanceo', requiereAuth: false },
   { value: 'cambio_frenos',       label: 'Cambio de frenos',      requiereAuth: false },
+  { value: 'revision_general',    label: 'Revisión general',      requiereAuth: false },
+  { value: 'enderezado_pintura',  label: 'Enderezado / pintura',  requiereAuth: true  },
+  { value: 'reposicion_llave',    label: 'Reposición de llave',   requiereAuth: false },
+  { value: 'sistema_electrico',   label: 'Sistema eléctrico',     requiereAuth: false },
+  { value: 'revision_ac',         label: 'Revisión A/C',          requiereAuth: false },
+  { value: 'revision_inyeccion',  label: 'Revisión inyección',    requiereAuth: false },
   { value: 'otro',                label: 'Otro',                  requiereAuth: false },
 ]
 

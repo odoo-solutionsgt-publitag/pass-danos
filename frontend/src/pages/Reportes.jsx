@@ -35,6 +35,12 @@ const TIPO_SERVICIO_LABELS = {
   cambio_bateria:      'Cambio de batería',
   alineacion_balanceo: 'Alineación / balanceo',
   cambio_frenos:       'Cambio de frenos',
+  revision_general:    'Revisión general',
+  enderezado_pintura:  'Enderezado / pintura',
+  reposicion_llave:    'Reposición de llave',
+  sistema_electrico:   'Sistema eléctrico',
+  revision_ac:         'Revisión A/C',
+  revision_inyeccion:  'Revisión inyección',
   otro:                'Otro',
 }
 

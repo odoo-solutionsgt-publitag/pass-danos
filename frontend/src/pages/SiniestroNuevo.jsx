@@ -79,6 +79,7 @@ export default function SiniestroNuevo() {
     lugar_accidente: '',
     tipo_dano: 'otro',
     severidad: 'leve',
+    forma_pago: 'cliente',
     descripcion: '',
   })
 
@@ -296,6 +297,7 @@ export default function SiniestroNuevo() {
         lugar_accidente: form.lugar_accidente,
         tipo_dano: form.tipo_dano,
         severidad: form.severidad,
+        forma_pago: form.forma_pago,
         descripcion: form.descripcion,
         estado: 'registrado',
         registrado_por: user.id,
@@ -591,6 +593,38 @@ export default function SiniestroNuevo() {
               <textarea value={form.descripcion} onChange={set('descripcion')} rows={4}
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-red-500 resize-none"
                 placeholder="Describa el daño con detalle..." />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Forma de pago anticipada</label>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { value: 'cliente', label: 'Cliente',  desc: 'El cliente paga el daño',         color: 'blue'  },
+                  { value: 'pass',    label: 'PASS',     desc: 'Pass absorbe el costo',          color: 'gray'  },
+                  { value: 'seguro',  label: 'Seguro',   desc: 'Cubierto por la póliza',         color: 'green' },
+                ].map(o => {
+                  const active = form.forma_pago === o.value
+                  return (
+                    <button
+                      key={o.value}
+                      type="button"
+                      onClick={() => setForm(f => ({ ...f, forma_pago: o.value }))}
+                      className={`p-3 border rounded-lg text-left transition-colors ${
+                        active
+                          ? o.color === 'blue'  ? 'border-blue-400 bg-blue-50' :
+                            o.color === 'gray'  ? 'border-gray-400 bg-gray-100' :
+                                                  'border-green-400 bg-green-50'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <p className={`text-sm font-semibold ${
+                        active ? (o.color === 'blue' ? 'text-blue-800' : o.color === 'gray' ? 'text-gray-800' : 'text-green-800') : 'text-gray-700'
+                      }`}>{o.label}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">{o.desc}</p>
+                    </button>
+                  )
+                })}
+              </div>
             </div>
           </>
         )}

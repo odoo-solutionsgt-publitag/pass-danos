@@ -19,6 +19,12 @@ const TIPO_LABELS = {
   cambio_bateria:      'Batería',
   alineacion_balanceo: 'Alineación',
   cambio_frenos:       'Frenos',
+  revision_general:    'Revisión gral.',
+  enderezado_pintura:  'Enderezado/Pintura',
+  reposicion_llave:    'Llave',
+  sistema_electrico:   'Eléctrico',
+  revision_ac:         'A/C',
+  revision_inyeccion:  'Inyección',
   otro:                'Otro',
 }
 
@@ -29,6 +35,12 @@ const TIPO_COLORS = {
   cambio_bateria:      'bg-blue-100 text-blue-700',
   alineacion_balanceo: 'bg-gray-100 text-gray-700',
   cambio_frenos:       'bg-amber-100 text-amber-700',
+  revision_general:    'bg-cyan-100 text-cyan-700',
+  enderezado_pintura:  'bg-purple-100 text-purple-700',
+  reposicion_llave:    'bg-yellow-100 text-yellow-700',
+  sistema_electrico:   'bg-orange-100 text-orange-700',
+  revision_ac:         'bg-sky-100 text-sky-700',
+  revision_inyeccion:  'bg-rose-100 text-rose-700',
   otro:                'bg-gray-100 text-gray-700',
 }
 

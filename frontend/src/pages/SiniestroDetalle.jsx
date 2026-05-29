@@ -507,7 +507,7 @@ export default function SiniestroDetalle() {
             <AlertTriangle size={16} className="text-gray-400" />
             <h3 className="font-semibold text-gray-800 text-sm">Detalle del daño</h3>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm mb-4">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 text-sm mb-4">
             <div>
               <p className="text-gray-400 text-xs mb-1">Fecha</p>
               <p className="font-medium text-gray-800">{formatDate(siniestro.fecha_dano)}</p>
@@ -524,6 +524,19 @@ export default function SiniestroDetalle() {
               <p className="text-gray-400 text-xs mb-1">Severidad</p>
               <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${SEVERIDAD_COLORS[siniestro.severidad]}`}>
                 {SEVERIDAD_LABELS[siniestro.severidad]}
+              </span>
+            </div>
+            <div>
+              <p className="text-gray-400 text-xs mb-1">Forma de pago</p>
+              <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${
+                siniestro.forma_pago === 'cliente' ? 'bg-blue-100 text-blue-700' :
+                siniestro.forma_pago === 'pass'    ? 'bg-gray-200 text-gray-700' :
+                siniestro.forma_pago === 'seguro'  ? 'bg-green-100 text-green-700' :
+                                                    'bg-gray-100 text-gray-500'
+              }`}>
+                {siniestro.forma_pago === 'cliente' ? 'Cliente' :
+                 siniestro.forma_pago === 'pass'    ? 'PASS' :
+                 siniestro.forma_pago === 'seguro'  ? 'Seguro' : '—'}
               </span>
             </div>
           </div>

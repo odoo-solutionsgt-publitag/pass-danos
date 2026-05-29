@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Plus, Search, Pencil, X, Save, Wrench, Package, AlertCircle, CheckCircle2 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { usePermisos } from '../hooks/usePermisos'
+import TallerContactosEditor from '../components/TallerContactosEditor'
 
 const TABS = [
   { key: 'talleres', label: 'Talleres', icon: Wrench },
@@ -301,6 +302,13 @@ function TallerModal({ taller, onClose, onSaved }) {
             />
             Taller activo
           </label>
+
+          {/* Contactos del taller (solo si ya existe el taller) */}
+          {taller.id && (
+            <div className="border-t border-gray-100 pt-4">
+              <TallerContactosEditor tallerId={taller.id} />
+            </div>
+          )}
         </div>
 
         <div className="sticky bottom-0 bg-white border-t border-gray-100 px-5 py-3 flex justify-end gap-2">

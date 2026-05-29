@@ -77,14 +77,23 @@ export default function FichaSiniestroPrint() {
         </div>
       </header>
 
-      {/* Estado + severidad badges */}
-      <div className="flex gap-2 mb-5">
+      {/* Estado + severidad + forma de pago badges */}
+      <div className="flex gap-2 mb-5 flex-wrap">
         <span className="px-3 py-1 bg-red-50 border border-red-200 text-red-700 text-xs font-semibold rounded-full uppercase">
           Estado: {ESTADO_LABELS[siniestro.estado]}
         </span>
         <span className="px-3 py-1 bg-amber-50 border border-amber-200 text-amber-700 text-xs font-semibold rounded-full uppercase">
           Severidad: {SEVERIDAD_LABELS[siniestro.severidad]}
         </span>
+        {siniestro.forma_pago && (
+          <span className={`px-3 py-1 text-xs font-semibold rounded-full uppercase border ${
+            siniestro.forma_pago === 'cliente' ? 'bg-blue-50 border-blue-200 text-blue-700' :
+            siniestro.forma_pago === 'pass'    ? 'bg-gray-100 border-gray-300 text-gray-700' :
+                                                 'bg-green-50 border-green-200 text-green-700'
+          }`}>
+            Paga: {siniestro.forma_pago === 'cliente' ? 'Cliente' : siniestro.forma_pago === 'pass' ? 'PASS' : 'Seguro'}
+          </span>
+        )}
       </div>
 
       {/* Vehículo + Cliente */}
@@ -132,7 +141,7 @@ export default function FichaSiniestroPrint() {
       {cotizacion && (
         <section className="border border-gray-200 rounded mb-5">
           <h2 className="bg-red-600 text-white text-xs font-bold uppercase px-3 py-1.5 tracking-wider flex items-center justify-between">
-            <span>Proforma — {cotizacion.talleres?.nombre}</span>
+            <span>Proforma — {cotizacion.talleres?.nombre}{cotizacion.variante && <span className="ml-2 normal-case text-[10px] opacity-90">({cotizacion.variante})</span>}</span>
             <span className="text-xs font-normal">{lineas.length} líneas</span>
           </h2>
           <table className="w-full text-xs">
@@ -161,6 +170,9 @@ export default function FichaSiniestroPrint() {
               <tr className="bg-gray-50"><td colSpan={4} className="px-3 py-1.5 text-right">Mano de obra</td><td className="px-3 py-1.5 text-right">{fmt(cotizacion.total_mano_obra)}</td></tr>
               {Number(cotizacion.total_otros) > 0 && (
                 <tr className="bg-gray-50"><td colSpan={4} className="px-3 py-1.5 text-right">Otros</td><td className="px-3 py-1.5 text-right">{fmt(cotizacion.total_otros)}</td></tr>
+              )}
+              {Number(cotizacion.total_descuentos) !== 0 && (
+                <tr className="bg-gray-50"><td colSpan={4} className="px-3 py-1.5 text-right text-red-600">Descuentos</td><td className="px-3 py-1.5 text-right text-red-600">{fmt(cotizacion.total_descuentos)}</td></tr>
               )}
               <tr className="bg-red-50 border-t-2 border-red-600">
                 <td colSpan={4} className="px-3 py-2 text-right font-bold">Costo taller (Pass paga)</td>
@@ -206,6 +218,48 @@ export default function FichaSiniestroPrint() {
           </table>
         </section>
       )}
+
+      {/* Fechas de taller (si hay alguna) */}
+      {(siniestro.fecha_entrega_taller || siniestro.fecha_estimada_entrega || siniestro.fecha_real_entrega) && (
+        <section className="border border-gray-200 rounded mb-5">
+          <h2 className="bg-red-600 text-white text-xs font-bold uppercase px-3 py-1.5 tracking-wider">Fechas de taller</h2>
+          <div className="p-3 grid grid-cols-3 gap-3 text-xs">
+            <div>
+              <p className="text-gray-400 uppercase text-[10px] mb-0.5">Entrega al taller</p>
+              <p className="font-medium">{formatDate(siniestro.fecha_entrega_taller) || '—'}</p>
+            </div>
+            <div>
+              <p className="text-gray-400 uppercase text-[10px] mb-0.5">Estimada de entrega</p>
+              <p className="font-medium">{formatDate(siniestro.fecha_estimada_entrega) || '—'}</p>
+            </div>
+            <div>
+              <p className="text-gray-400 uppercase text-[10px] mb-0.5">Real de entrega</p>
+              <p className="font-medium">{formatDate(siniestro.fecha_real_entrega) || '—'}</p>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Checklist documentos */}
+      <section className="border border-gray-200 rounded mb-5">
+        <h2 className="bg-red-600 text-white text-xs font-bold uppercase px-3 py-1.5 tracking-wider">Documentos al cierre</h2>
+        <div className="p-3 grid grid-cols-3 gap-3 text-xs">
+          {[
+            { key: 'tiene_prefactura', label: 'Prefactura' },
+            { key: 'tiene_proforma',   label: 'Proforma' },
+            { key: 'tiene_factura',    label: 'Factura' },
+          ].map(d => (
+            <div key={d.key} className="flex items-center gap-2">
+              <span className={`w-4 h-4 rounded border-2 flex items-center justify-center text-[10px] font-bold ${
+                siniestro[d.key] ? 'border-green-600 bg-green-50 text-green-700' : 'border-gray-300 text-gray-300'
+              }`}>
+                {siniestro[d.key] ? '✓' : ''}
+              </span>
+              <span className={siniestro[d.key] ? 'font-medium' : 'text-gray-400'}>{d.label}</span>
+            </div>
+          ))}
+        </div>
+      </section>
 
       {/* Firmas */}
       <section className="grid grid-cols-2 gap-6 mt-12 text-xs">

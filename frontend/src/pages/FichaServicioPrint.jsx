@@ -6,6 +6,9 @@ const TIPO_SERVICIO_LABELS = {
   servicio_menor: 'Servicio menor', servicio_mayor: 'Servicio mayor',
   cambio_llantas: 'Cambio de llantas', cambio_bateria: 'Cambio de batería',
   alineacion_balanceo: 'Alineación y balanceo', cambio_frenos: 'Cambio de frenos',
+  revision_general: 'Revisión general', enderezado_pintura: 'Enderezado / pintura',
+  reposicion_llave: 'Reposición de llave', sistema_electrico: 'Sistema eléctrico',
+  revision_ac: 'Revisión A/C', revision_inyeccion: 'Revisión inyección',
   otro: 'Otro',
 }
 const ESTADO_LABELS = {
@@ -49,7 +52,8 @@ export default function FichaServicioPrint() {
 
   const totalRepuestos = lineas.filter(l => l.tipo === 'repuesto').reduce((s, l) => s + Number(l.subtotal || 0), 0)
   const totalManoObra  = lineas.filter(l => l.tipo === 'mano_obra').reduce((s, l) => s + Number(l.subtotal || 0), 0)
-  const totalOtros     = lineas.filter(l => l.tipo === 'otro').reduce((s, l) => s + Number(l.subtotal || 0), 0)
+  const totalOtros       = lineas.filter(l => l.tipo === 'otro').reduce((s, l) => s + Number(l.subtotal || 0), 0)
+  const totalDescuentos  = lineas.filter(l => l.tipo === 'descuento').reduce((s, l) => s + Number(l.subtotal || 0), 0)
   const totalGeneral   = Number(orden.total_general || 0)
 
   return (
@@ -165,6 +169,9 @@ export default function FichaServicioPrint() {
               {totalOtros > 0 && (
                 <tr className="bg-slate-50"><td colSpan={4} className="px-3 py-1.5 text-right">Otros</td><td className="px-3 py-1.5 text-right">{fmt(totalOtros)}</td></tr>
               )}
+              {totalDescuentos !== 0 && (
+                <tr className="bg-slate-50"><td colSpan={4} className="px-3 py-1.5 text-right text-red-600">Descuentos</td><td className="px-3 py-1.5 text-right text-red-600">{fmt(totalDescuentos)}</td></tr>
+              )}
               <tr className="bg-slate-800 text-white border-t-2 border-slate-900">
                 <td colSpan={4} className="px-3 py-2 text-right font-bold">TOTAL</td>
                 <td className="px-3 py-2 text-right font-bold">{fmt(totalGeneral)}</td>
@@ -200,6 +207,48 @@ export default function FichaServicioPrint() {
           </table>
         </section>
       )}
+
+      {/* Fechas de taller (si hay alguna) */}
+      {(orden.fecha_entrega_taller || orden.fecha_estimada_entrega || orden.fecha_real_entrega) && (
+        <section className="border border-slate-200 rounded mb-5">
+          <h2 className="bg-slate-800 text-white text-xs font-bold uppercase px-3 py-1.5 tracking-wider">Fechas de taller</h2>
+          <div className="p-3 grid grid-cols-3 gap-3 text-xs">
+            <div>
+              <p className="text-slate-400 uppercase text-[10px] mb-0.5">Entrega al taller</p>
+              <p className="font-medium">{formatDate(orden.fecha_entrega_taller) || '—'}</p>
+            </div>
+            <div>
+              <p className="text-slate-400 uppercase text-[10px] mb-0.5">Estimada de entrega</p>
+              <p className="font-medium">{formatDate(orden.fecha_estimada_entrega) || '—'}</p>
+            </div>
+            <div>
+              <p className="text-slate-400 uppercase text-[10px] mb-0.5">Real de entrega</p>
+              <p className="font-medium">{formatDate(orden.fecha_real_entrega) || '—'}</p>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Checklist documentos */}
+      <section className="border border-slate-200 rounded mb-5">
+        <h2 className="bg-slate-800 text-white text-xs font-bold uppercase px-3 py-1.5 tracking-wider">Documentos al cierre</h2>
+        <div className="p-3 grid grid-cols-3 gap-3 text-xs">
+          {[
+            { key: 'tiene_prefactura', label: 'Prefactura' },
+            { key: 'tiene_proforma',   label: 'Proforma' },
+            { key: 'tiene_factura',    label: 'Factura' },
+          ].map(d => (
+            <div key={d.key} className="flex items-center gap-2">
+              <span className={`w-4 h-4 rounded border-2 flex items-center justify-center text-[10px] font-bold ${
+                orden[d.key] ? 'border-green-600 bg-green-50 text-green-700' : 'border-slate-300 text-slate-300'
+              }`}>
+                {orden[d.key] ? '✓' : ''}
+              </span>
+              <span className={orden[d.key] ? 'font-medium' : 'text-slate-400'}>{d.label}</span>
+            </div>
+          ))}
+        </div>
+      </section>
 
       {/* Firmas */}
       <section className="grid grid-cols-3 gap-6 mt-12 text-xs">
