@@ -4,12 +4,21 @@
   * {
     box-sizing: border-box;
   }
+  html {
+    font-size: 18px;
+  }
   body {
     margin: 0;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     background-color: #f3f4f6;
     color: #111827;
+  }
+}
+
+@media print {
+  html {
+    font-size: 16px;
   }
 }
