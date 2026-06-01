@@ -88,10 +88,15 @@ CREATE TRIGGER audit_bitacora_actualizaciones
   EXECUTE FUNCTION audit_changes();
 
 -- ────────────────────────────────────────────────────────────
--- 5. Permisos al service_role (consistente con el resto del schema)
+-- 5. Permisos a nivel Postgres (GRANTs)
+--    Necesarios además de RLS — sin esto, da "permission denied for table".
+--    Las RLS policies controlan QUÉ filas; los GRANT controlan SI el rol
+--    puede tocar la tabla del todo.
 -- ────────────────────────────────────────────────────────────
 
-GRANT ALL ON bitacora_actualizaciones TO service_role;
+GRANT ALL                ON bitacora_actualizaciones TO service_role;
+GRANT SELECT, INSERT     ON bitacora_actualizaciones TO authenticated;
+GRANT SELECT             ON bitacora_actualizaciones TO anon;
 
 COMMIT;
 
