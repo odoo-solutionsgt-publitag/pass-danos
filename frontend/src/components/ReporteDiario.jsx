@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { ClipboardList, Printer, Download } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { formatDate as fmtDateLib } from '../lib/fecha'
+import { CHECKING_LABELS, CHECKING_COLORS } from './InfoOperacional'
 
 const TIPO_DANO_LABELS = {
   choque_frontal: 'Choque frontal',
@@ -98,7 +99,7 @@ export default function ReporteDiario() {
         talleres(nombre),
         siniestros!inner(
           id, numero, placa, tipo_vehiculo, tipo_dano, descripcion, forma_pago,
-          fecha_estimada_entrega, estado
+          fecha_estimada_entrega, estado, estado_checking
         )
       `)
       .is('fecha_egreso', null)
@@ -163,6 +164,7 @@ export default function ReporteDiario() {
       fechaIngreso:   d.fecha_ingreso,
       fechaEstSalida: d.siniestros.fecha_estimada_entrega,
       dias:           d.dias_en_taller ?? 0,
+      checking:       d.siniestros.estado_checking,
       motivo:         [
         TIPO_DANO_LABELS[d.siniestros.tipo_dano] ?? d.siniestros.tipo_dano,
         d.siniestros.descripcion,
@@ -181,6 +183,7 @@ export default function ReporteDiario() {
       fechaIngreso:   s.fecha_ingreso,
       fechaEstSalida: s.ordenes_servicio.fecha_estimada_entrega,
       dias:           s.dias_en_taller ?? 0,
+      checking:       null,
       motivo:         [
         TIPO_SERVICIO_LABELS[s.ordenes_servicio.tipo_servicio] ?? s.ordenes_servicio.tipo_servicio,
         s.ordenes_servicio.descripcion,
@@ -207,7 +210,7 @@ export default function ReporteDiario() {
   }
 
   function exportarCSV() {
-    const headers = ['No','Placa','Tipo veh.','Registro','Taller','Ingreso','Est. salida','Días','Motivo','Observaciones']
+    const headers = ['No','Placa','Tipo veh.','Registro','Taller','Ingreso','Est. salida','Días','Etapa checking','Motivo','Observaciones']
     const lines = filasFiltradas.map((f, idx) => [
       idx + 1,
       f.placa,
@@ -217,6 +220,7 @@ export default function ReporteDiario() {
       f.fechaIngreso ?? '',
       f.fechaEstSalida ?? '',
       f.dias,
+      f.checking ? (CHECKING_LABELS[f.checking] ?? f.checking) : '',
       `"${(f.motivo || '').replace(/"/g, '""')}"`,
       `"${(f.observaciones || '').replace(/"/g, '""')}"`,
     ].join(','))
@@ -336,6 +340,7 @@ export default function ReporteDiario() {
               <th className="px-3 py-2 font-medium">Ingreso</th>
               <th className="px-3 py-2 font-medium">Est. salida</th>
               <th className="px-3 py-2 font-medium text-center">Días</th>
+              <th className="px-3 py-2 font-medium">Etapa checking</th>
               <th className="px-3 py-2 font-medium">Motivo</th>
               <th className="px-3 py-2 font-medium">Observaciones</th>
             </tr>
@@ -344,7 +349,7 @@ export default function ReporteDiario() {
             {loading ? (
               Array.from({ length: 3 }).map((_, i) => (
                 <tr key={i}>
-                  {Array.from({ length: 10 }).map((_, j) => (
+                  {Array.from({ length: 11 }).map((_, j) => (
                     <td key={j} className="px-3 py-2">
                       <div className="h-3 bg-gray-100 rounded animate-pulse" />
                     </td>
@@ -353,7 +358,7 @@ export default function ReporteDiario() {
               ))
             ) : filasFiltradas.length === 0 ? (
               <tr>
-                <td colSpan={10} className="px-3 py-10 text-center text-gray-400 text-sm italic">
+                <td colSpan={11} className="px-3 py-10 text-center text-gray-400 text-sm italic">
                   No hay vehículos en taller en este mes con los filtros seleccionados.
                 </td>
               </tr>
@@ -384,6 +389,15 @@ export default function ReporteDiario() {
                       {f.dias}
                       <span className={`inline-block w-2.5 h-2.5 rounded-full ${semaforoColor(f.dias)}`} />
                     </span>
+                  </td>
+                  <td className="px-3 py-2">
+                    {f.checking ? (
+                      <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium border ${CHECKING_COLORS[f.checking] || ''}`}>
+                        {CHECKING_LABELS[f.checking] ?? f.checking}
+                      </span>
+                    ) : (
+                      <span className="text-gray-300 text-xs">—</span>
+                    )}
                   </td>
                   <td className="px-3 py-2 text-gray-700 max-w-[220px] truncate" title={f.motivo}>
                     {f.motivo || '—'}

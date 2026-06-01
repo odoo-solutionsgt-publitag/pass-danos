@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, ArrowRight, Check, Search, FileText, Car, Building2, X } from 'lucide-react'
 import { supabase } from '../lib/supabase'
-import { fetchVehiculos, fetchVehiculo, buscarContratos, fetchContratoById, syncBitacora } from '../lib/odoo-api'
+import { fetchVehiculos, fetchVehiculo, buscarContratos, fetchContratoById, syncBitacora, updateVehiculoStatus } from '../lib/odoo-api'
 import { formatDate as fmtDateLib } from '../lib/fecha'
 import { useAuth } from '../hooks/useAuth'
 import { usePermisos } from '../hooks/usePermisos'
@@ -84,6 +84,10 @@ export default function SiniestroNuevo() {
     severidad: 'leve',
     forma_pago: 'cliente',
     descripcion: '',
+    ubicacion_vehiculo: 'pass',
+    ubicacion_detalle: '',
+    estado_checking: 'pre_diagnostico',
+    disponible_renta: false,
   })
 
   // Cargar lista de vehículos para la pestaña de placa
@@ -310,6 +314,10 @@ export default function SiniestroNuevo() {
         severidad: form.severidad,
         forma_pago: form.forma_pago,
         descripcion: form.descripcion,
+        ubicacion_vehiculo: form.ubicacion_vehiculo,
+        ubicacion_detalle:  form.ubicacion_vehiculo === 'otro' ? (form.ubicacion_detalle.trim() || null) : null,
+        estado_checking:    form.estado_checking,
+        disponible_renta:   form.disponible_renta,
         estado: 'registrado',
         registrado_por: user.id,
       }).select().single()
@@ -319,6 +327,13 @@ export default function SiniestroNuevo() {
       // Sincronizar URL de bitácora en Odoo (best-effort, no bloquea)
       syncBitacora({ placa: form.placa.toUpperCase(), odoo_product_id: form.odoo_product_id })
         .catch(e => console.warn('[syncBitacora]', e.message))
+
+      // Sincronizar status del vehículo en Odoo según disponible_renta (best-effort)
+      if (form.odoo_product_id) {
+        const targetStatus = form.disponible_renta ? 'Disponible' : 'En Reparación'
+        updateVehiculoStatus(form.odoo_product_id, targetStatus)
+          .catch(e => console.warn('[updateVehiculoStatus]', e.message))
+      }
 
       navigate(`/siniestros/${data.id}`)
     } catch (err) {
@@ -642,6 +657,97 @@ export default function SiniestroNuevo() {
                     </button>
                   )
                 })}
+              </div>
+            </div>
+
+            {/* ─── Información operacional ──────────────────────────── */}
+            <div className="pt-4 border-t border-gray-100 space-y-4">
+              <p className="text-sm font-semibold text-gray-700">Información operacional</p>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-2">Ubicación del vehículo</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { value: 'pass',   label: 'Pass',   desc: 'En instalaciones de Pass' },
+                    { value: 'taller', label: 'Taller', desc: 'En taller proveedor'      },
+                    { value: 'otro',   label: 'Otro',   desc: 'Otra ubicación'           },
+                  ].map(o => {
+                    const active = form.ubicacion_vehiculo === o.value
+                    return (
+                      <button
+                        key={o.value}
+                        type="button"
+                        onClick={() => setForm(f => ({ ...f, ubicacion_vehiculo: o.value }))}
+                        className={`p-3 border rounded-lg text-left transition-colors ${
+                          active ? 'border-red-400 bg-red-50' : 'border-gray-200 hover:border-gray-300'
+                        }`}
+                      >
+                        <p className={`text-sm font-semibold ${active ? 'text-red-800' : 'text-gray-700'}`}>{o.label}</p>
+                        <p className="text-xs text-gray-500 mt-0.5">{o.desc}</p>
+                      </button>
+                    )
+                  })}
+                </div>
+                {form.ubicacion_vehiculo === 'otro' && (
+                  <input
+                    type="text"
+                    value={form.ubicacion_detalle}
+                    onChange={e => setForm(f => ({ ...f, ubicacion_detalle: e.target.value }))}
+                    placeholder="Detalle de la ubicación (ej: Agencia Mercedes Zona 9)"
+                    className="w-full mt-2 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-red-500"
+                  />
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-2">Estado del checking</label>
+                  <select
+                    value={form.estado_checking}
+                    onChange={e => setForm(f => ({ ...f, estado_checking: e.target.value }))}
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-red-500 bg-white"
+                  >
+                    <option value="pre_diagnostico">Pre-Diagnóstico</option>
+                    <option value="diagnostico_cotizacion">Diagnóstico / Cotización</option>
+                    <option value="reparacion">Reparación</option>
+                    <option value="revision_final">Revisión Final</option>
+                    <option value="entrega_proveedor">Entrega del Proveedor</option>
+                    <option value="dano_completo">Daño Completo (Pérdida Total)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-2">¿Disponible para renta?</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setForm(f => ({ ...f, disponible_renta: true }))}
+                      className={`p-2 border rounded-lg text-sm font-medium transition-colors ${
+                        form.disponible_renta
+                          ? 'border-green-400 bg-green-50 text-green-800'
+                          : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                      }`}
+                    >
+                      Disponible
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setForm(f => ({ ...f, disponible_renta: false }))}
+                      className={`p-2 border rounded-lg text-sm font-medium transition-colors ${
+                        !form.disponible_renta
+                          ? 'border-red-400 bg-red-50 text-red-800'
+                          : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                      }`}
+                    >
+                      No Disponible
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">
+                    {form.disponible_renta
+                      ? 'Odoo se marcará como "Disponible"'
+                      : 'Odoo se marcará como "En Reparación"'}
+                  </p>
+                </div>
               </div>
             </div>
           </>

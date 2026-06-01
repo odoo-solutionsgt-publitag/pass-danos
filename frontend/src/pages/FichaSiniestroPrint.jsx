@@ -140,6 +140,40 @@ export default function FichaSiniestroPrint() {
         )}
       </section>
 
+      {/* Estado operacional */}
+      <section className="border border-gray-200 rounded mb-5">
+        <h2 className="bg-red-600 text-white text-xs font-bold uppercase px-3 py-1.5 tracking-wider">Estado operacional</h2>
+        <div className="p-3 grid grid-cols-3 gap-3 text-xs">
+          <div>
+            <p className="text-gray-400 uppercase text-[10px] mb-0.5">Ubicación</p>
+            <p className="font-medium">
+              {siniestro.ubicacion_vehiculo === 'pass'   ? 'Pass' :
+               siniestro.ubicacion_vehiculo === 'taller' ? 'Taller' :
+               siniestro.ubicacion_vehiculo === 'otro'   ? `Otro${siniestro.ubicacion_detalle ? ' — ' + siniestro.ubicacion_detalle : ''}` :
+               '—'}
+            </p>
+          </div>
+          <div>
+            <p className="text-gray-400 uppercase text-[10px] mb-0.5">Estado del checking</p>
+            <p className="font-medium">
+              {siniestro.estado_checking === 'pre_diagnostico'        ? 'Pre-Diagnóstico' :
+               siniestro.estado_checking === 'diagnostico_cotizacion' ? 'Diagnóstico / Cotización' :
+               siniestro.estado_checking === 'reparacion'             ? 'Reparación' :
+               siniestro.estado_checking === 'revision_final'         ? 'Revisión Final' :
+               siniestro.estado_checking === 'entrega_proveedor'      ? 'Entrega del Proveedor' :
+               siniestro.estado_checking === 'dano_completo'          ? 'Daño Completo (Pérdida Total)' :
+               '—'}
+            </p>
+          </div>
+          <div>
+            <p className="text-gray-400 uppercase text-[10px] mb-0.5">Disponible para renta</p>
+            <p className={`font-medium ${siniestro.disponible_renta ? 'text-green-700' : 'text-red-700'}`}>
+              {siniestro.disponible_renta ? 'Disponible' : 'No Disponible'}
+            </p>
+          </div>
+        </div>
+      </section>
+
       {/* Proforma si existe */}
       {cotizacion && (
         <section className="border border-gray-200 rounded mb-5">

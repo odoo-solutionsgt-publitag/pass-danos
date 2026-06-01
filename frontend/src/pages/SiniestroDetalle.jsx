@@ -16,6 +16,7 @@ import ChecklistCierre from '../components/ChecklistCierre'
 import FechasTaller from '../components/FechasTaller'
 import HistorialCambios from '../components/HistorialCambios'
 import BitacoraActualizaciones from '../components/BitacoraActualizaciones'
+import InfoOperacional from '../components/InfoOperacional'
 import { formatDate as fmtDate, formatDateTime as fmtDateTime } from '../lib/fecha'
 
 // ── Labels y colores ──────────────────────────────────────────
@@ -548,6 +549,9 @@ export default function SiniestroDetalle() {
             <p className="text-sm text-gray-600 border-t border-gray-50 pt-3">{siniestro.descripcion}</p>
           )}
         </div>
+
+        {/* ── Información operacional ─────────────────────────── */}
+        <InfoOperacional siniestro={siniestro} onUpdate={loadAll} />
 
         {/* ── Cotizaciones (visible solo cuando estado=cotizando) ── */}
         {estado === 'cotizando' && (

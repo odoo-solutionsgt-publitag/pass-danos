@@ -4,6 +4,7 @@ import { Plus, Search, Printer } from 'lucide-react'
 import { usePermisos } from '../hooks/usePermisos'
 import { siniestrosQuery } from '../lib/queries'
 import { formatDate as fmtDate } from '../lib/fecha'
+import { CHECKING_LABELS, CHECKING_COLORS } from '../components/InfoOperacional'
 
 const ESTADO_COLORS = {
   registrado: 'bg-gray-100 text-gray-700',
@@ -54,7 +55,7 @@ export default function Siniestros() {
 
   async function loadSiniestros() {
     setLoading(true)
-    let q = siniestrosQuery('id,numero,fecha_dano,placa,cliente_nombre,tipo_dano,severidad,monto_cliente,estado,created_at')
+    let q = siniestrosQuery('id,numero,fecha_dano,placa,cliente_nombre,tipo_dano,severidad,monto_cliente,estado,estado_checking,created_at')
       .order('created_at', { ascending: false })
       .limit(200)
 
@@ -150,6 +151,7 @@ export default function Siniestros() {
                 <th className="text-left px-5 py-3 text-xs text-gray-500 font-medium">Severidad</th>
                 <th className="text-left px-5 py-3 text-xs text-gray-500 font-medium">Total Q.</th>
                 <th className="text-left px-5 py-3 text-xs text-gray-500 font-medium">Estado</th>
+                <th className="text-left px-5 py-3 text-xs text-gray-500 font-medium">Checking</th>
                 <th className="px-5 py-3 w-12" />
               </tr>
             </thead>
@@ -157,7 +159,7 @@ export default function Siniestros() {
               {loading ? (
                 Array.from({ length: 6 }).map((_, i) => (
                   <tr key={i}>
-                    {Array.from({ length: 9 }).map((_, j) => (
+                    {Array.from({ length: 10 }).map((_, j) => (
                       <td key={j} className="px-5 py-3.5">
                         <div className="h-3.5 bg-gray-100 rounded animate-pulse w-20" />
                       </td>
@@ -166,7 +168,7 @@ export default function Siniestros() {
                 ))
               ) : filtrados.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-5 py-12 text-center text-gray-400">
+                  <td colSpan={10} className="px-5 py-12 text-center text-gray-400">
                     No se encontraron daños registrados
                   </td>
                 </tr>
@@ -192,6 +194,13 @@ export default function Siniestros() {
                       <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${ESTADO_COLORS[s.estado]}`}>
                         {ESTADO_LABELS[s.estado] ?? s.estado}
                       </span>
+                    </td>
+                    <td className="px-5 py-3.5">
+                      {s.estado_checking && (
+                        <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium border ${CHECKING_COLORS[s.estado_checking] || ''}`}>
+                          {CHECKING_LABELS[s.estado_checking] ?? s.estado_checking}
+                        </span>
+                      )}
                     </td>
                     <td className="px-5 py-3.5">
                       <button
