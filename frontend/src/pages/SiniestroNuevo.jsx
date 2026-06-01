@@ -70,11 +70,13 @@ export default function SiniestroNuevo() {
     odoo_product_id: null,
     contrato_id: null,
     contrato_numero: '',
+    reservacion_numero: '',
     cliente_nombre: '',
     cliente_dpi: '',
     cliente_nit: '',
     cliente_telefono: '',
     cliente_email: '',
+    cliente_direccion: '',
     fecha_dano: new Date().toISOString().slice(0, 10),
     lugar_accidente: '',
     tipo_dano: 'otro',
@@ -117,11 +119,13 @@ export default function SiniestroNuevo() {
       odoo_product_id: null,
       contrato_id: null,
       contrato_numero: '',
+      reservacion_numero: '',
       cliente_nombre: tipo === 'placa' ? 'Pass Rent a Car (Interno)' : '',
       cliente_dpi: '',
       cliente_nit: '',
       cliente_telefono: '',
       cliente_email: '',
+      cliente_direccion: '',
     }))
   }
 
@@ -169,12 +173,14 @@ export default function SiniestroNuevo() {
         anio: data.vehiculo?.anio ?? null,
         odoo_product_id: data.vehiculo?.odoo_id ?? null,
         contrato_id: data.contrato?.odoo_id ?? null,
-        contrato_numero: data.contrato?.numero ?? '',
+        contrato_numero: data.contrato?.contrato_numero ?? '',
+        reservacion_numero: data.contrato?.reservacion_numero ?? data.contrato?.numero ?? '',
         cliente_nombre: data.cliente?.nombre ?? '',
         cliente_dpi: data.cliente?.dpi ?? '',
         cliente_nit: data.cliente?.nit ?? '',
         cliente_telefono: data.cliente?.telefono ?? '',
         cliente_email: data.cliente?.email ?? '',
+        cliente_direccion: data.cliente?.direccion ?? '',
       }))
     } catch (err) {
       setSearchError('Error cargando detalle: ' + err.message)
@@ -199,11 +205,13 @@ export default function SiniestroNuevo() {
       odoo_product_id: null,
       contrato_id: null,
       contrato_numero: '',
+      reservacion_numero: '',
       cliente_nombre: '',
       cliente_dpi: '',
       cliente_nit: '',
       cliente_telefono: '',
       cliente_email: '',
+      cliente_direccion: '',
     }))
   }
 
@@ -287,12 +295,14 @@ export default function SiniestroNuevo() {
         anio: form.anio,
         odoo_product_id: form.odoo_product_id,
         contrato_id: form.contrato_id,
-        contrato_numero: form.contrato_numero,
+        contrato_numero: form.contrato_numero || null,
+        reservacion_numero: form.reservacion_numero || null,
         cliente_nombre: form.cliente_nombre,
         cliente_dpi: form.cliente_dpi,
         cliente_telefono: form.cliente_telefono,
         cliente_email: form.cliente_email,
         cliente_nit: form.cliente_nit,
+        cliente_direccion: form.cliente_direccion || null,
         fecha_dano: form.fecha_dano,
         lugar_accidente: form.lugar_accidente,
         tipo_dano: form.tipo_dano,
@@ -380,7 +390,7 @@ export default function SiniestroNuevo() {
                       <input
                         value={contratoQuery}
                         onChange={handleContratoQueryChange}
-                        placeholder="Escribe el número: 394, RSV-00394..."
+                        placeholder="Reservación (RSV-00394) o No. de contrato (CT-...)"
                         className="w-full pl-9 pr-4 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-red-500 font-mono"
                         autoFocus
                       />
@@ -399,6 +409,9 @@ export default function SiniestroNuevo() {
                           >
                             <div>
                               <span className="font-semibold text-red-700 font-mono">{c.numero}</span>
+                              {c.contrato_numero && (
+                                <span className="ml-2 text-xs font-mono text-blue-700">· Contrato {c.contrato_numero}</span>
+                              )}
                               <span className="text-gray-600 ml-3">{c.cliente_nombre}</span>
                             </div>
                             <span className="text-xs text-gray-400">
@@ -425,9 +438,13 @@ export default function SiniestroNuevo() {
                             <X size={16} />
                           </button>
                         </div>
-                        <p className="text-green-700"><span className="font-medium">No. Contrato:</span> <span className="font-mono">{form.contrato_numero}</span></p>
+                        {form.reservacion_numero && (
+                          <p className="text-green-700"><span className="font-medium">Reservación:</span> <span className="font-mono">{form.reservacion_numero}</span></p>
+                        )}
+                        <p className="text-green-700"><span className="font-medium">No. Contrato:</span> <span className="font-mono">{form.contrato_numero || '— (sin contrato en Odoo)'}</span></p>
                         {form.placa && <p className="text-green-700"><span className="font-medium">Vehículo:</span> {form.placa} — {form.tipo_vehiculo}</p>}
                         {form.cliente_nombre && <p className="text-green-700"><span className="font-medium">Cliente:</span> {form.cliente_nombre}</p>}
+                        {form.cliente_direccion && <p className="text-green-700 text-xs"><span className="font-medium">Dirección:</span> {form.cliente_direccion}</p>}
                       </>
                     )}
                   </div>

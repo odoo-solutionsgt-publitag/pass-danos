@@ -469,7 +469,8 @@ export default function SiniestroDetalle() {
               <Row label="Marca" value={siniestro.marca} />
               <Row label="Línea" value={siniestro.linea} />
               <Row label="Año" value={siniestro.anio} />
-              <Row label="Contrato" value={<span className="font-mono">{siniestro.contrato_numero}</span>} />
+              <Row label="No. Contrato" value={<span className="font-mono">{siniestro.contrato_numero}</span>} />
+              <Row label="Reservación" value={<span className="font-mono">{siniestro.reservacion_numero}</span>} />
               <Row label="Taller asignado" value={siniestro.talleres?.nombre} />
             </dl>
           </div>
@@ -494,11 +495,13 @@ export default function SiniestroDetalle() {
             </div>
             <dl className="space-y-2 text-sm">
               <Row label="Nombre" value={siniestro.cliente_nombre} bold />
-              <Row label="Contrato" value={siniestro.contrato_numero} />
+              <Row label="No. Contrato" value={siniestro.contrato_numero} />
+              <Row label="Reservación" value={siniestro.reservacion_numero} />
               <Row label="DPI / Pasaporte" value={siniestro.cliente_dpi} />
               <Row label="NIT" value={siniestro.cliente_nit} />
               <Row label="Teléfono" value={siniestro.cliente_telefono} />
               <Row label="Correo" value={siniestro.cliente_email} />
+              <Row label="Dirección" value={siniestro.cliente_direccion} />
             </dl>
           </div>
         </div>

@@ -170,22 +170,52 @@ async function getVehiculoFromOrder(uid, orderId, orderLines) {
 
 // Helper: obtener datos de cliente desde res.partner
 async function getClienteFromPartner(uid, partnerId, partnerName) {
-  if (!partnerId) return { nombre: '', telefono: '', email: '', dpi: '', nit: '' };
+  const vacio = { nombre: '', telefono: '', email: '', dpi: '', nit: '', direccion: '' };
+  if (!partnerId) return vacio;
   try {
     const partners = await odooExecute(uid, 'res.partner', 'read', [[partnerId]], {
-      fields: ['phone', 'mobile', 'email', 'vat', 'x_studio_dpipasaporte_cliente'],
+      fields: [
+        'name', 'phone', 'mobile', 'email', 'vat',
+        'x_studio_dpipasaporte_cliente',
+        'street', 'street2', 'city',
+        'is_company', 'child_ids',
+      ],
     });
-    if (!partners.length) return { nombre: partnerName || '', telefono: '', email: '', dpi: '', nit: '' };
-    return {
-      nombre: partnerName || '',
-      telefono: partners[0].phone || partners[0].mobile || '',
-      email: partners[0].email || '',
-      dpi: partners[0].x_studio_dpipasaporte_cliente || '',
-      nit: partners[0].vat || '',
+    if (!partners.length) return { ...vacio, nombre: partnerName || '' };
+    const p = partners[0];
+
+    const resultado = {
+      nombre:    partnerName || p.name || '',
+      telefono:  p.phone || p.mobile || '',
+      email:     p.email || '',
+      dpi:       p.x_studio_dpipasaporte_cliente || '',
+      nit:       p.vat || '',
+      direccion: [p.street, p.street2, p.city].filter(Boolean).join(', '),
     };
+
+    // Fallback empresa → contactos hijos para teléfono/email
+    if (p.is_company && Array.isArray(p.child_ids) && p.child_ids.length > 0 &&
+        (!resultado.telefono || !resultado.email)) {
+      try {
+        const hijos = await odooExecute(uid, 'res.partner', 'read', [p.child_ids], {
+          fields: ['name', 'phone', 'mobile', 'email', 'type', 'function'],
+        });
+        const contacto = hijos.find(h =>
+          (h.type === 'contact' || !h.type) && (h.phone || h.mobile || h.email)
+        );
+        if (contacto) {
+          resultado.telefono = resultado.telefono || contacto.phone || contacto.mobile || '';
+          resultado.email    = resultado.email    || contacto.email                       || '';
+        }
+      } catch (errHijos) {
+        console.warn('[getClienteFromPartner] Error leyendo child_ids:', errHijos.message);
+      }
+    }
+
+    return resultado;
   } catch (err) {
     console.warn('[getClienteFromPartner] Error:', err.message);
-    return { nombre: partnerName || '', telefono: '', email: '', dpi: '', nit: '' };
+    return { ...vacio, nombre: partnerName || '' };
   }
 }
 
@@ -526,7 +556,7 @@ app.post('/siniestros/:id/refresh-cliente', async (req, res) => {
     // 2. Releer el contrato en Odoo
     const uid = await getUid();
     const orders = await odooExecute(uid, 'sale.order', 'read', [[sin.contrato_id]], {
-      fields: ['id', 'name', 'partner_id'],
+      fields: ['id', 'name', 'x_studio_no_contrato', 'partner_id'],
     });
     if (!orders.length) {
       return res.status(404).json({ error: `Contrato ${sin.contrato_id} no encontrado en Odoo` });
@@ -541,11 +571,14 @@ app.post('/siniestros/:id/refresh-cliente', async (req, res) => {
 
     // 4. Actualizar siniestro con los datos frescos (sin tocar nombre si ya estaba bien)
     const updateData = {
-      cliente_nombre:    cliente.nombre || sin.cliente_nombre,
-      cliente_dpi:       cliente.dpi || null,
-      cliente_nit:       cliente.nit || null,
-      cliente_telefono:  cliente.telefono || null,
-      cliente_email:     cliente.email || null,
+      cliente_nombre:     cliente.nombre || sin.cliente_nombre,
+      cliente_dpi:        cliente.dpi       || null,
+      cliente_nit:        cliente.nit       || null,
+      cliente_telefono:   cliente.telefono  || null,
+      cliente_email:      cliente.email     || null,
+      cliente_direccion:  cliente.direccion || null,
+      reservacion_numero: order.name        || null,
+      contrato_numero:    order.x_studio_no_contrato || null,
     };
     const updRes = await supabase.from('siniestros').update(updateData).eq('id', id);
     if (updRes.error) throw updRes.error;
@@ -638,7 +671,7 @@ app.get('/vehiculo/:placa', async (req, res) => {
           ['is_rental_order', '=', true],
         ]
       ], {
-        fields: ['id', 'name', 'partner_id', 'date_order', 'state', 'order_line'],
+        fields: ['id', 'name', 'x_studio_no_contrato', 'partner_id', 'date_order', 'state', 'order_line'],
         order: 'date_order desc',
         limit: 1,
       });
@@ -649,12 +682,15 @@ app.get('/vehiculo/:placa', async (req, res) => {
         contrato = {
           odoo_id: order.id,
           numero: order.name,
-          contrato_numero: order.name,
+          reservacion_numero: order.name,
+          contrato_numero: order.x_studio_no_contrato || null,
           cliente_id: order.partner_id?.[0] ?? null,
           cliente_nombre: cliente.nombre,
           cliente_telefono: cliente.telefono,
           cliente_email: cliente.email,
           cliente_dpi: cliente.dpi,
+          cliente_nit: cliente.nit,
+          cliente_direccion: cliente.direccion,
           fecha_orden: order.date_order,
           estado: order.state,
         };
@@ -697,10 +733,12 @@ app.get('/contratos', async (req, res) => {
       [
         ['is_rental_order', '=', true],
         ['state', 'in', ['sale', 'done']],
-        ['name', 'ilike', q],
+        '|',
+          ['name', 'ilike', q],
+          ['x_studio_no_contrato', 'ilike', q],
       ]
     ], {
-      fields: ['id', 'name', 'partner_id', 'date_order', 'state'],
+      fields: ['id', 'name', 'x_studio_no_contrato', 'partner_id', 'date_order', 'state'],
       order: 'date_order desc',
       limit: 10,
     });
@@ -709,6 +747,8 @@ app.get('/contratos', async (req, res) => {
       contratos: orders.map(o => ({
         odoo_id: o.id,
         numero: o.name,
+        reservacion_numero: o.name,
+        contrato_numero: o.x_studio_no_contrato || null,
         cliente_nombre: o.partner_id ? o.partner_id[1] : '',
         fecha_orden: o.date_order,
         estado: o.state,
@@ -731,7 +771,7 @@ app.get('/contratos/:id', async (req, res) => {
     if (isNaN(orderId)) return res.status(400).json({ error: 'ID inválido' });
 
     const orders = await odooExecute(uid, 'sale.order', 'read', [[orderId]], {
-      fields: ['id', 'name', 'partner_id', 'date_order', 'state', 'order_line'],
+      fields: ['id', 'name', 'x_studio_no_contrato', 'partner_id', 'date_order', 'state', 'order_line'],
     });
 
     if (!orders.length) return res.status(404).json({ error: `Contrato ${orderId} no encontrado` });
@@ -746,7 +786,8 @@ app.get('/contratos/:id', async (req, res) => {
       contrato: {
         odoo_id: order.id,
         numero: order.name,
-        contrato_numero: order.name,
+        reservacion_numero: order.name,
+        contrato_numero: order.x_studio_no_contrato || null,
         estado: order.state,
         fecha_orden: order.date_order,
       },

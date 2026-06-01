@@ -343,7 +343,7 @@ function VehiculoDrawer({ vehiculo, onClose }) {
             <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-2">
               <div className="flex items-center gap-2 text-blue-900 font-semibold text-sm">
                 <FileText size={15} />
-                Contrato activo: {contrato.contrato_numero}
+                Contrato activo: {contrato.contrato_numero || contrato.reservacion_numero || contrato.numero}
               </div>
               <div className="text-sm space-y-1.5 text-gray-700">
                 <p className="flex items-center gap-2"><User size={13} className="text-gray-400" /> {contrato.cliente_nombre || '—'}</p>

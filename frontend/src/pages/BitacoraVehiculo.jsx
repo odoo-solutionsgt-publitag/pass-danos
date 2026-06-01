@@ -201,12 +201,15 @@ export default function BitacoraVehiculo() {
           </h2>
           {contrato ? (
             <dl className="grid grid-cols-2 gap-y-2 gap-x-4 text-sm">
-              <Dato label="Contrato" value={contrato.contrato_numero} mono />
+              <Dato label="No. Contrato" value={contrato.contrato_numero || '—'} mono />
+              <Dato label="Reservación" value={contrato.reservacion_numero || contrato.numero} mono />
               <Dato label="Fecha" value={formatDate(contrato.fecha_orden)} />
               <Dato label="Cliente" value={contrato.cliente_nombre} bold className="col-span-2" />
               {contrato.cliente_dpi && <Dato label="DPI" value={contrato.cliente_dpi} icon={Hash} />}
+              {contrato.cliente_nit && <Dato label="NIT" value={contrato.cliente_nit} icon={Hash} />}
               {contrato.cliente_telefono && <Dato label="Teléfono" value={contrato.cliente_telefono} icon={Phone} />}
               {contrato.cliente_email && <Dato label="Correo" value={contrato.cliente_email} icon={Mail} className="col-span-2" />}
+              {contrato.cliente_direccion && <Dato label="Dirección" value={contrato.cliente_direccion} className="col-span-2" />}
             </dl>
           ) : loading ? (
             <div className="h-24 bg-gray-50 animate-pulse rounded" />

@@ -106,7 +106,8 @@ export default function FichaSiniestroPrint() {
             <PrintRow label="Marca" value={siniestro.marca} />
             <PrintRow label="Línea" value={siniestro.linea} />
             <PrintRow label="Año" value={siniestro.anio} />
-            <PrintRow label="Contrato" value={siniestro.contrato_numero} />
+            <PrintRow label="No. Contrato" value={siniestro.contrato_numero} />
+            <PrintRow label="Reservación" value={siniestro.reservacion_numero} />
           </dl>
         </section>
         <section className="border border-gray-200 rounded">
@@ -117,6 +118,7 @@ export default function FichaSiniestroPrint() {
             <PrintRow label="NIT" value={siniestro.cliente_nit} />
             <PrintRow label="Teléfono" value={siniestro.cliente_telefono} />
             <PrintRow label="Correo" value={siniestro.cliente_email} />
+            <PrintRow label="Dirección" value={siniestro.cliente_direccion} />
           </dl>
         </section>
       </div>
