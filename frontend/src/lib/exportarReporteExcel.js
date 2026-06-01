@@ -29,45 +29,49 @@ export async function exportarReporteExcel({ filas, info, nombreArchivo }) {
     views: [{ state: 'frozen', xSplit: 0, ySplit: 7 }],
   })
 
-  // ── Logo ──────────────────────────────────────────────────────
+  // ── Logo (300x100 px, alineado a la izquierda desde col A) ───
   try {
     const logoBlob = await fetch('/pass-35-logo.png').then(r => r.blob())
     const logoBuf  = await logoBlob.arrayBuffer()
     const logoId   = wb.addImage({ buffer: logoBuf, extension: 'png' })
-    ws.addImage(logoId, { tl: { col: 0, row: 0 }, ext: { width: 110, height: 85 } })
+    ws.addImage(logoId, {
+      tl: { col: 0, row: 0 },        // columna A, fila 1 (offset ≤ 5px desde el borde)
+      ext: { width: 300, height: 100 },
+      editAs: 'oneCell',
+    })
   } catch (e) {
     console.warn('[exportarReporteExcel] No se pudo cargar el logo:', e.message)
   }
 
-  // Altura de filas del header
+  // Altura de filas del header (4 filas × 22pt ≈ 117 px, acomoda el logo de 100px)
   ws.getRow(1).height = 22
   ws.getRow(2).height = 22
   ws.getRow(3).height = 22
   ws.getRow(4).height = 22
 
-  // ── Título y meta ─────────────────────────────────────────────
-  ws.mergeCells('B1:L1')
-  ws.getCell('B1').value = 'PASS RENT A CAR GUATEMALA'
-  ws.getCell('B1').font  = { name: 'Calibri', size: 14, bold: true, color: { argb: 'FF111827' } }
-  ws.getCell('B1').alignment = { vertical: 'middle', horizontal: 'left' }
+  // ── Título y meta (desde columna F para no traslaparse con el logo) ──
+  ws.mergeCells('F1:L1')
+  ws.getCell('F1').value = 'PASS RENT A CAR GUATEMALA'
+  ws.getCell('F1').font  = { name: 'Calibri', size: 14, bold: true, color: { argb: 'FF111827' } }
+  ws.getCell('F1').alignment = { vertical: 'middle', horizontal: 'left' }
 
-  ws.mergeCells('B2:L2')
-  ws.getCell('B2').value = info.titulo
-  ws.getCell('B2').font  = { name: 'Calibri', size: 12, bold: true, color: { argb: 'FFE53935' } }
-  ws.getCell('B2').alignment = { vertical: 'middle', horizontal: 'left' }
+  ws.mergeCells('F2:L2')
+  ws.getCell('F2').value = info.titulo
+  ws.getCell('F2').font  = { name: 'Calibri', size: 12, bold: true, color: { argb: 'FF111827' } }
+  ws.getCell('F2').alignment = { vertical: 'middle', horizontal: 'left' }
 
-  ws.mergeCells('B3:L3')
-  ws.getCell('B3').value = `${info.fechaLabel}    ·    Total: ${info.total}`
-  ws.getCell('B3').font  = { name: 'Calibri', size: 10, color: { argb: 'FF374151' } }
-  ws.getCell('B3').alignment = { vertical: 'middle', horizontal: 'left' }
+  ws.mergeCells('F3:L3')
+  ws.getCell('F3').value = `${info.fechaLabel}    ·    Total registros: ${info.total}`
+  ws.getCell('F3').font  = { name: 'Calibri', size: 10, color: { argb: 'FF374151' } }
+  ws.getCell('F3').alignment = { vertical: 'middle', horizontal: 'left' }
 
-  ws.mergeCells('B4:L4')
-  ws.getCell('B4').value = `Generado: ${new Date().toLocaleString('es-GT', {
+  ws.mergeCells('F4:L4')
+  ws.getCell('F4').value = `Generado: ${new Date().toLocaleString('es-GT', {
     day: '2-digit', month: 'short', year: 'numeric',
     hour: '2-digit', minute: '2-digit',
   })}`
-  ws.getCell('B4').font  = { name: 'Calibri', size: 9, italic: true, color: { argb: 'FF6B7280' } }
-  ws.getCell('B4').alignment = { vertical: 'middle', horizontal: 'left' }
+  ws.getCell('F4').font  = { name: 'Calibri', size: 9, italic: true, color: { argb: 'FF6B7280' } }
+  ws.getCell('F4').alignment = { vertical: 'middle', horizontal: 'left' }
 
   // Fila 5: separador vacío
   ws.getRow(5).height = 6
