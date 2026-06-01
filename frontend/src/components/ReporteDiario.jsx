@@ -395,7 +395,7 @@ export default function ReporteDiario() {
               <th className="px-3 py-2 font-medium leading-tight">Fecha Aprox.<br/>Ingreso</th>
               <th className="px-3 py-2 font-medium text-center leading-tight">Días en<br/>Taller</th>
               <th className="px-3 py-2 font-medium">Etapa checking</th>
-              <th className="px-3 py-2 font-medium">Motivo</th>
+              <th className="px-3 py-2 font-medium leading-tight">Motivo de<br/>envío a taller</th>
               <th className="px-3 py-2 font-medium">Observaciones</th>
             </tr>
           </thead>

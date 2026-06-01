@@ -100,7 +100,8 @@ export async function exportarReporteExcel({ filas, info, nombreArchivo }) {
     'Fecha Aprox.\nIngreso',
     'Días en\nTaller',
     'Etapa checking',
-    'Motivo', 'Observaciones',
+    'Motivo de\nenvío a taller',
+    'Observaciones',
   ]
   ws.getRow(7).values = headers
   ws.getRow(7).height = 32

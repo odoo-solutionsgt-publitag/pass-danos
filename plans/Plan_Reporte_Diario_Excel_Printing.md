@@ -1,9 +1,66 @@
 # Plan — Reporte Diario: Exportar a Excel + Mejora de Impresión
 
-**Estado**: 📋 Pendiente de aprobación
+**Estado**: ✅ Implementado en producción (incluye refinamientos de etiquetas)
 **Origen**: Requerimiento operacional — el CSV actual no es suficiente para presentación gerencial
 **Prioridad**: Alta
-**Estimado**: 1 sesión (2 – 3 horas)
+**Estimado**: 1 sesión (2 – 3 horas) + ~30 min de iteraciones de etiquetas
+
+---
+
+## Bitácora de refinamientos post-implementación
+
+Esta sección documenta los ajustes que el usuario solicitó tras revisar el primer build. Todos son cambios puramente de UI / etiquetas — sin tocar BD ni backend.
+
+### Logo del Excel
+- Tamaño: 300 × 100 px (antes 110 × 85)
+- Anclado en columna A, fila 1, con offset máximo de 5px desde el borde izquierdo
+- `editAs: 'oneCell'` para que el logo no se distorsione al redimensionar
+
+### Disposición de textos del header del Excel
+- Movido el bloque de títulos de columna B a **columna F** (`F1:L1` … `F4:L4`)
+- Razón: evitar traslape con el logo que ahora ocupa columnas A-E
+
+### Color del título dinámico
+- "Registro de Daños/Servicios" (y variantes) cambia de **rojo Pass** a **negro `#111827` negrita**
+- Etiqueta de fila 3: "Total" → "Total registros"
+
+### Encabezados de columnas a doble línea (dashboard + Excel)
+
+Aplica idéntico al dashboard (con `<br/>` y `leading-tight`) y al Excel (con `\n` y `wrapText: true`):
+
+| Antes | Ahora |
+|-------|-------|
+| Taller | **Taller** ⏎ Asignado |
+| F. Registro | **Fecha** ⏎ Registro |
+| Est. salida | **Fecha Aprox.** ⏎ Ingreso |
+| Días | **Días en** ⏎ Taller |
+| Motivo | **Motivo de** ⏎ envío a taller |
+
+Altura de fila de headers en Excel: 22pt → 32pt para acomodar las 2 líneas.
+
+### Días en negativo
+
+| Valor interno | Display dashboard | Display Excel |
+|---------------|-------------------|---------------|
+| 0 | `0` | `0` |
+| 3 | `-3` | `-3` (número real) |
+| 7 | `-7` | `-7` (número real) |
+
+- En Excel el valor se almacena como número negativo real (no string) para preservar ordenamiento numérico, sumas, filtros
+- El **semáforo (verde 0-2, ámbar 3-5, rojo 6+) sigue comparando con el valor absoluto positivo** internamente — la celda colorea igual que antes aunque el número visible sea negativo
+- Implementación interna: `dias` sigue siendo positivo en memoria; solo cambia el render (`-${dias}` o `-dias`)
+
+### Sin cambios
+
+- ✅ BD: no se tocó ninguna columna, índice, trigger o función
+- ✅ Backend: no requiere redeploy
+- ✅ Cálculo de días: idéntico (today − fechaRegistro)
+- ✅ Lógica de filtros y queries: igual
+- ✅ Layout general del Excel: solo cambian etiquetas y posición de textos del header
+
+---
+
+## Plan original aprobado
 
 ---
 
