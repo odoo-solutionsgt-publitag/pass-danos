@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Search, FileText, Printer, Download } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { formatDate as fmtDateLib } from '../lib/fecha'
 
 const ESTADO_SINIESTRO_LABELS = {
   proforma_emitida:  'Proforma emitida',
@@ -66,8 +67,7 @@ export default function Proformas() {
   })
 
   function formatDate(iso) {
-    if (!iso) return '—'
-    return new Date(iso).toLocaleDateString('es-GT', { day: '2-digit', month: 'short', year: 'numeric' })
+    return fmtDateLib(iso) ?? '—'
   }
   function formatMonto(v) {
     if (v == null) return '—'

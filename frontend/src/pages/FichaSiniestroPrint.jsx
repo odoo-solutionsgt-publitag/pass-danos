@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { formatDate as fmtDateLib } from '../lib/fecha'
 
 const SEVERIDAD_LABELS = { leve: 'Leve', medio: 'Medio', severo: 'Severo', perdida_total: 'Pérdida total' }
 const TIPO_DANO_LABELS = {
@@ -15,7 +16,7 @@ const ESTADO_LABELS = {
 }
 
 function fmt(n) { return `Q ${Number(n || 0).toLocaleString('es-GT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` }
-function formatDate(iso) { return iso ? new Date(iso).toLocaleDateString('es-GT', { day: '2-digit', month: 'long', year: 'numeric' }) : '—' }
+function formatDate(iso) { return fmtDateLib(iso, { day: '2-digit', month: 'long', year: 'numeric' }) ?? '—' }
 
 export default function FichaSiniestroPrint() {
   const { id } = useParams()

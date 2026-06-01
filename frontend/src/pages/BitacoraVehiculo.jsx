@@ -8,6 +8,7 @@ import { supabase } from '../lib/supabase'
 import { fetchVehiculo } from '../lib/odoo-api'
 import { siniestrosQuery, ordenesServicioQuery } from '../lib/queries'
 import { usePermisos } from '../hooks/usePermisos'
+import { formatDate as fmtDateLib } from '../lib/fecha'
 
 const SEVERIDAD_COLORS = {
   leve:          'bg-green-100 text-green-700',
@@ -49,8 +50,7 @@ function fmt(n) {
 }
 
 function formatDate(iso) {
-  if (!iso) return '—'
-  return new Date(iso).toLocaleDateString('es-GT', { day: '2-digit', month: 'short', year: 'numeric' })
+  return fmtDateLib(iso) ?? '—'
 }
 
 export default function BitacoraVehiculo() {

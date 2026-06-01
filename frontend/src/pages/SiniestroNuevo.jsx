@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, ArrowRight, Check, Search, FileText, Car, Building2, X } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { fetchVehiculos, fetchVehiculo, buscarContratos, fetchContratoById, syncBitacora } from '../lib/odoo-api'
+import { formatDate as fmtDateLib } from '../lib/fecha'
 import { useAuth } from '../hooks/useAuth'
 import { usePermisos } from '../hooks/usePermisos'
 
@@ -415,7 +416,7 @@ export default function SiniestroNuevo() {
                               <span className="text-gray-600 ml-3">{c.cliente_nombre}</span>
                             </div>
                             <span className="text-xs text-gray-400">
-                              {c.fecha_orden ? new Date(c.fecha_orden).toLocaleDateString('es-GT') : ''}
+                              {fmtDateLib(c.fecha_orden) ?? ''}
                             </span>
                           </button>
                         ))}

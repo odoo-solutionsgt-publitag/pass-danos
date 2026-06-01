@@ -6,6 +6,7 @@ import {
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { usePermisos } from '../hooks/usePermisos'
+import { formatDateTime as fmtDateTimeLib } from '../lib/fecha'
 
 const ROLES = [
   { value: 'admin',         label: 'Admin',         color: 'bg-red-100 text-red-700' },
@@ -90,8 +91,7 @@ export default function Usuarios() {
   })
 
   function formatDate(iso) {
-    if (!iso) return '—'
-    return new Date(iso).toLocaleDateString('es-GT', { day: '2-digit', month: 'short', year: 'numeric' })
+    return fmtDateTimeLib(iso) ?? '—'
   }
 
   if (authLoading) return <div className="p-8 text-center text-gray-400">Cargando...</div>

@@ -16,6 +16,7 @@ import ChecklistCierre from '../components/ChecklistCierre'
 import FechasTaller from '../components/FechasTaller'
 import HistorialCambios from '../components/HistorialCambios'
 import BitacoraActualizaciones from '../components/BitacoraActualizaciones'
+import { formatDate as fmtDate, formatDateTime as fmtDateTime } from '../lib/fecha'
 
 // ── Labels y colores ──────────────────────────────────────────
 
@@ -88,11 +89,9 @@ function semaforoColor(dias) {
   return 'bg-red-500'
 }
 
-function formatDate(iso, opts = {}) {
+function formatDate(iso, opts) {
   if (!iso) return '—'
-  return new Date(iso).toLocaleDateString('es-GT', {
-    day: '2-digit', month: 'short', year: 'numeric', ...opts
-  })
+  return opts?.hour ? (fmtDateTime(iso) ?? '—') : (fmtDate(iso) ?? '—')
 }
 
 // ── Modal de confirmación simple ──────────────────────────────

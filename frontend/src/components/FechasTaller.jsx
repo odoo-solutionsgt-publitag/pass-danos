@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Calendar, Save, Edit2 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { usePermisos } from '../hooks/usePermisos'
+import { formatDate, diffDays } from '../lib/fecha'
 
 const CAMPOS = [
   { key: 'fecha_entrega_taller',   label: 'Entrega al taller',   help: 'Día que el vehículo se entregó físicamente al taller' },
@@ -29,18 +30,9 @@ export default function FechasTaller({ tabla, registroId, valores, onUpdate }) {
   const [saving, setSaving] = useState(false)
   const [error, setError]   = useState('')
 
-  function formatDate(iso) {
-    if (!iso) return null
-    return new Date(iso).toLocaleDateString('es-GT', {
-      day: '2-digit', month: 'short', year: 'numeric',
-    })
-  }
-
   function diferenciaDias() {
     const { fecha_estimada_entrega, fecha_real_entrega } = valores_
-    if (!fecha_estimada_entrega || !fecha_real_entrega) return null
-    const ms = new Date(fecha_real_entrega) - new Date(fecha_estimada_entrega)
-    return Math.round(ms / (1000 * 60 * 60 * 24))
+    return diffDays(fecha_estimada_entrega, fecha_real_entrega)
   }
 
   async function guardar() {

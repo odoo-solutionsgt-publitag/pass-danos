@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { ChevronDown, ChevronRight, ClipboardList, Plus, Pencil, Trash2, User } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { formatDateTime as fmtDateTimeLib } from '../lib/fecha'
 
 const OP_ICONS = {
   INSERT: { icon: Plus,    color: 'text-green-600 bg-green-50', label: 'Creado' },
@@ -51,11 +52,7 @@ export default function HistorialCambios({ tabla, filaId, titulo = 'Historial de
   }
 
   function formatDateTime(iso) {
-    if (!iso) return '—'
-    return new Date(iso).toLocaleString('es-GT', {
-      day: '2-digit', month: 'short', year: 'numeric',
-      hour: '2-digit', minute: '2-digit',
-    })
+    return fmtDateTimeLib(iso) ?? '—'
   }
 
   return (

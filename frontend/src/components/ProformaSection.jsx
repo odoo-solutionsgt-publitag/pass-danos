@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import DocumentosSection from './DocumentosSection'
 import { usePermisos } from '../hooks/usePermisos'
+import { formatDateTime as fmtDateTimeLib } from '../lib/fecha'
 
 const TIPO_LABELS = { repuesto: 'Repuesto', mano_obra: 'Mano de obra', otro: 'Otro', descuento: 'Descuento' }
 
@@ -71,7 +72,7 @@ export default function ProformaSection({ siniestro, onUpdate }) {
           <p className="text-xs text-gray-400 mt-0.5">
             Cotización aprobada
             {cotizacion.updated_at && (
-              <span> · Última edición: {new Date(cotizacion.updated_at).toLocaleString('es-GT', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+              <span> · Última edición: {fmtDateTimeLib(cotizacion.updated_at)}</span>
             )}
           </p>
         </div>

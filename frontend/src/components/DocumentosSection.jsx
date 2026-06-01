@@ -3,6 +3,7 @@ import { Upload, Download, Trash2, FileText, FileImage, FileSpreadsheet, File as
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { usePermisos } from '../hooks/usePermisos'
+import { formatDateTime as fmtDateTimeLib } from '../lib/fecha'
 
 const TIPO_LABELS = {
   cotizacion_pdf:    'Cotización',
@@ -362,8 +363,7 @@ export function formatSize(bytes) {
 }
 
 function formatDate(iso) {
-  if (!iso) return '—'
-  return new Date(iso).toLocaleDateString('es-GT', { day: '2-digit', month: 'short', year: 'numeric' })
+  return fmtDateTimeLib(iso) ?? '—'
 }
 
 export { TIPO_LABELS, TIPO_COLORS }

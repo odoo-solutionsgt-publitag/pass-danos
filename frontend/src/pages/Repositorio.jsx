@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Search, Download, FolderOpen } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { FileTypeIcon, formatSize, TIPO_LABELS, TIPO_COLORS } from '../components/DocumentosSection'
+import { formatDateTime as fmtDateTimeLib } from '../lib/fecha'
 
 export default function Repositorio() {
   const navigate = useNavigate()
@@ -250,9 +251,5 @@ export default function Repositorio() {
 }
 
 function formatDate(iso) {
-  if (!iso) return '—'
-  return new Date(iso).toLocaleString('es-GT', {
-    day: '2-digit', month: 'short', year: 'numeric',
-    hour: '2-digit', minute: '2-digit',
-  })
+  return fmtDateTimeLib(iso) ?? '—'
 }

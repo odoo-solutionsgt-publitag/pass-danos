@@ -4,6 +4,7 @@ import { AlertTriangle, FileText, Wrench, Car, Clock } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { siniestrosQuery } from '../lib/queries'
 import ReporteDiario from '../components/ReporteDiario'
+import { formatDate as fmtDateLib, formatDateTime as fmtDateTimeLib } from '../lib/fecha'
 
 const ESTADO_LABELS = {
   registrado: 'Registrado',
@@ -91,7 +92,10 @@ export default function Dashboard() {
   }
 
   function formatDate(iso) {
-    return new Date(iso).toLocaleDateString('es-GT', { day: '2-digit', month: 'short', year: 'numeric' })
+    return fmtDateLib(iso) ?? '—'
+  }
+  function formatDateTime(iso) {
+    return fmtDateTimeLib(iso) ?? '—'
   }
 
   return (
@@ -198,7 +202,7 @@ export default function Dashboard() {
                       {item.siniestros?.numero} — {item.accion}
                     </p>
                     {item.detalle && <p className="text-xs text-gray-500">{item.detalle}</p>}
-                    <p className="text-xs text-gray-400 mt-0.5">{formatDate(item.created_at)}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">{formatDateTime(item.created_at)}</p>
                   </div>
                 </div>
               ))

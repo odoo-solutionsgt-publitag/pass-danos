@@ -5,6 +5,7 @@ import { fetchVehiculos, fetchVehiculo } from '../lib/odoo-api'
 import { supabase } from '../lib/supabase'
 import { siniestrosQuery, ordenesServicioQuery } from '../lib/queries'
 import { usePermisos } from '../hooks/usePermisos'
+import { formatDate as fmtDateLib } from '../lib/fecha'
 
 const STATUS_COLORS = {
   'Disponible':            { card: 'bg-green-50 border-green-200',  badge: 'bg-green-100 text-green-700 border-green-200',  dot: 'bg-green-500'  },
@@ -289,8 +290,7 @@ function VehiculoDrawer({ vehiculo, onClose }) {
   const contrato = detalle?.contrato
 
   function formatDate(iso) {
-    if (!iso) return '—'
-    return new Date(iso).toLocaleDateString('es-GT', { day: '2-digit', month: 'short', year: 'numeric' })
+    return fmtDateLib(iso) ?? '—'
   }
 
   function formatMonto(v) {

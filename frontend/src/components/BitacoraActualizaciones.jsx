@@ -3,15 +3,12 @@ import { ClipboardEdit, Send, User } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { usePermisos } from '../hooks/usePermisos'
+import { formatDateTime as fmtDateTime } from '../lib/fecha'
 
 const MAX_LEN = 500
 
 function formatDateTime(iso) {
-  if (!iso) return ''
-  return new Date(iso).toLocaleString('es-GT', {
-    day: '2-digit', month: 'short', year: 'numeric',
-    hour: '2-digit', minute: '2-digit',
-  })
+  return fmtDateTime(iso) ?? ''
 }
 
 export default function BitacoraActualizaciones({ tipo, registroId }) {

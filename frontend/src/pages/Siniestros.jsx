@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Plus, Search, Printer } from 'lucide-react'
 import { usePermisos } from '../hooks/usePermisos'
 import { siniestrosQuery } from '../lib/queries'
+import { formatDate as fmtDate } from '../lib/fecha'
 
 const ESTADO_COLORS = {
   registrado: 'bg-gray-100 text-gray-700',
@@ -76,8 +77,7 @@ export default function Siniestros() {
   })
 
   function formatDate(iso) {
-    if (!iso) return '—'
-    return new Date(iso).toLocaleDateString('es-GT', { day: '2-digit', month: 'short', year: 'numeric' })
+    return fmtDate(iso) ?? '—'
   }
 
   function formatMonto(v) {

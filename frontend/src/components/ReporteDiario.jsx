@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ClipboardList, Printer, Download } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { formatDate as fmtDateLib } from '../lib/fecha'
 
 const TIPO_DANO_LABELS = {
   choque_frontal: 'Choque frontal',
@@ -39,8 +40,7 @@ const FORMA_PAGO_LABELS = {
 }
 
 function fmtDate(iso) {
-  if (!iso) return '—'
-  return new Date(iso).toLocaleDateString('es-GT', { day: '2-digit', month: 'short' })
+  return fmtDateLib(iso, { day: '2-digit', month: 'short' }) ?? '—'
 }
 
 function semaforoColor(dias) {
