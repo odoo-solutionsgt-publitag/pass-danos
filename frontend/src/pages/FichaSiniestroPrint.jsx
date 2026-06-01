@@ -161,7 +161,7 @@ export default function FichaSiniestroPrint() {
                siniestro.estado_checking === 'reparacion'             ? 'Reparación' :
                siniestro.estado_checking === 'revision_final'         ? 'Revisión Final' :
                siniestro.estado_checking === 'entrega_proveedor'      ? 'Entrega del Proveedor' :
-               siniestro.estado_checking === 'dano_completo'          ? 'Daño Completo (Pérdida Total)' :
+               siniestro.estado_checking === 'dano_completo'          ? 'Daño Total' :
                '—'}
             </p>
           </div>

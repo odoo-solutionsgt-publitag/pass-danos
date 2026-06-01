@@ -712,7 +712,7 @@ export default function SiniestroNuevo() {
                     <option value="reparacion">Reparación</option>
                     <option value="revision_final">Revisión Final</option>
                     <option value="entrega_proveedor">Entrega del Proveedor</option>
-                    <option value="dano_completo">Daño Completo (Pérdida Total)</option>
+                    <option value="dano_completo">Daño Total</option>
                   </select>
                 </div>
 

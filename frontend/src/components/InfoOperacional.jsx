@@ -16,7 +16,7 @@ const CHECKING_OPTS = [
   { value: 'reparacion',             label: 'Reparación',               color: 'bg-blue-100 text-blue-700 border-blue-200' },
   { value: 'revision_final',         label: 'Revisión Final',           color: 'bg-indigo-100 text-indigo-700 border-indigo-200' },
   { value: 'entrega_proveedor',      label: 'Entrega del Proveedor',    color: 'bg-teal-100 text-teal-700 border-teal-200' },
-  { value: 'dano_completo',          label: 'Daño Completo (Pérd. Total)', color: 'bg-red-100 text-red-700 border-red-200' },
+  { value: 'dano_completo',          label: 'Daño Total',               color: 'bg-red-100 text-red-700 border-red-200' },
 ]
 
 export const CHECKING_LABELS = Object.fromEntries(CHECKING_OPTS.map(o => [o.value, o.label]))

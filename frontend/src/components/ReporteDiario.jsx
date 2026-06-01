@@ -91,45 +91,39 @@ export default function ReporteDiario() {
     setLoading(true)
     const { inicio, fin } = rangoMes(mes)
 
-    // Daños actualmente en taller (sin fecha_egreso) que ingresaron en el mes
+    // ── Daños activos (ficha creada en el mes, no cerrados/anulados, no disponibles para renta) ──
     const danosQ = supabase
-      .from('taller_ingresos')
+      .from('siniestros')
       .select(`
-        id, fecha_ingreso, dias_en_taller,
-        talleres(nombre),
-        siniestros!inner(
-          id, numero, placa, tipo_vehiculo, tipo_dano, descripcion, forma_pago,
-          fecha_estimada_entrega, estado, estado_checking
-        )
+        id, numero, placa, tipo_vehiculo, tipo_dano, descripcion, forma_pago,
+        fecha_dano, fecha_estimada_entrega, estado, estado_checking,
+        ubicacion_vehiculo, ubicacion_detalle, disponible_renta, taller_id,
+        talleres(nombre)
       `)
-      .is('fecha_egreso', null)
-      .not('siniestro_id', 'is', null)
-      .gte('fecha_ingreso', inicio)
-      .lte('fecha_ingreso', fin)
-      .order('fecha_ingreso')
+      .not('estado', 'in', '("cerrado","anulado")')
+      .eq('disponible_renta', false)
+      .gte('fecha_dano', inicio)
+      .lte('fecha_dano', fin)
+      .order('fecha_dano')
 
-    // Servicios actualmente en taller
+    // ── Servicios activos (ficha programada en el mes, no completados/cancelados) ──
     const serviciosQ = supabase
-      .from('taller_ingresos')
+      .from('ordenes_servicio')
       .select(`
-        id, fecha_ingreso, dias_en_taller,
-        talleres(nombre),
-        ordenes_servicio!inner(
-          id, numero, placa, tipo_vehiculo, tipo_servicio, descripcion,
-          fecha_estimada_entrega, estado
-        )
+        id, numero, placa, tipo_vehiculo, tipo_servicio, descripcion,
+        fecha_programada, fecha_estimada_entrega, estado, taller_id,
+        talleres(nombre)
       `)
-      .is('fecha_egreso', null)
-      .not('orden_servicio_id', 'is', null)
-      .gte('fecha_ingreso', inicio)
-      .lte('fecha_ingreso', fin)
-      .order('fecha_ingreso')
+      .not('estado', 'in', '("completado","cancelado")')
+      .gte('fecha_programada', inicio)
+      .lte('fecha_programada', fin)
+      .order('fecha_programada')
 
     const [{ data: danos }, { data: servicios }] = await Promise.all([danosQ, serviciosQ])
 
     // IDs para traer últimas notas
-    const danosIds     = (danos ?? []).map(d => d.siniestros.id)
-    const serviciosIds = (servicios ?? []).map(s => s.ordenes_servicio.id)
+    const danosIds     = (danos ?? []).map(d => d.id)
+    const serviciosIds = (servicios ?? []).map(s => s.id)
 
     let notasMap = { dano: {}, servicio: {} }
     if (danosIds.length || serviciosIds.length) {
@@ -152,47 +146,68 @@ export default function ReporteDiario() {
       }
     }
 
-    // Normalizar a un solo array de filas
+    // Función para calcular días desde fecha de registro hasta hoy
+    const diasDesde = (iso) => {
+      if (!iso) return 0
+      const [y, m, d] = iso.split('-').map(Number)
+      const inicio = new Date(y, m - 1, d)
+      const hoy = new Date()
+      hoy.setHours(0, 0, 0, 0)
+      const ms = hoy - inicio
+      return Math.max(0, Math.round(ms / (1000 * 60 * 60 * 24)))
+    }
+
+    const ubicacionLabel = (u, detalle) => {
+      if (u === 'pass')   return 'Pass'
+      if (u === 'taller') return 'Taller'
+      if (u === 'otro')   return detalle ? `Otro (${detalle})` : 'Otro'
+      return '—'
+    }
+
+    // ── Filas de daños ──
     const filasDanos = (danos ?? []).map(d => ({
       id:             d.id,
       tipoRegistro:   'dano',
-      registroId:     d.siniestros.id,
-      numero:         d.siniestros.numero,
-      placa:          d.siniestros.placa,
-      tipoVehiculo:   d.siniestros.tipo_vehiculo,
+      registroId:     d.id,
+      numero:         d.numero,
+      placa:          d.placa,
+      tipoVehiculo:   d.tipo_vehiculo,
+      ubicacion:      ubicacionLabel(d.ubicacion_vehiculo, d.ubicacion_detalle),
       taller:         d.talleres?.nombre ?? '—',
-      fechaIngreso:   d.fecha_ingreso,
-      fechaEstSalida: d.siniestros.fecha_estimada_entrega,
-      dias:           d.dias_en_taller ?? 0,
-      checking:       d.siniestros.estado_checking,
+      fechaRegistro:  d.fecha_dano,
+      fechaEstSalida: d.fecha_estimada_entrega,
+      dias:           diasDesde(d.fecha_dano),
+      checking:       d.estado_checking,
       motivo:         [
-        TIPO_DANO_LABELS[d.siniestros.tipo_dano] ?? d.siniestros.tipo_dano,
-        d.siniestros.descripcion,
+        TIPO_DANO_LABELS[d.tipo_dano] ?? d.tipo_dano,
+        d.descripcion,
       ].filter(Boolean).join(' · '),
-      observaciones:  notasMap.dano[d.siniestros.id] ?? FORMA_PAGO_LABELS[d.siniestros.forma_pago] ?? '—',
+      observaciones:  notasMap.dano[d.id] ?? FORMA_PAGO_LABELS[d.forma_pago] ?? '—',
     }))
 
+    // ── Filas de servicios ──
     const filasServicios = (servicios ?? []).map(s => ({
       id:             s.id,
       tipoRegistro:   'servicio',
-      registroId:     s.ordenes_servicio.id,
-      numero:         s.ordenes_servicio.numero,
-      placa:          s.ordenes_servicio.placa,
-      tipoVehiculo:   s.ordenes_servicio.tipo_vehiculo,
+      registroId:     s.id,
+      numero:         s.numero,
+      placa:          s.placa,
+      tipoVehiculo:   s.tipo_vehiculo,
+      ubicacion:      '—', // ordenes_servicio no tiene ubicacion_vehiculo
       taller:         s.talleres?.nombre ?? '—',
-      fechaIngreso:   s.fecha_ingreso,
-      fechaEstSalida: s.ordenes_servicio.fecha_estimada_entrega,
-      dias:           s.dias_en_taller ?? 0,
-      checking:       null,
+      fechaRegistro:  s.fecha_programada,
+      fechaEstSalida: s.fecha_estimada_entrega,
+      dias:           diasDesde(s.fecha_programada),
+      checking:       null, // servicios no usan estado_checking
       motivo:         [
-        TIPO_SERVICIO_LABELS[s.ordenes_servicio.tipo_servicio] ?? s.ordenes_servicio.tipo_servicio,
-        s.ordenes_servicio.descripcion,
+        TIPO_SERVICIO_LABELS[s.tipo_servicio] ?? s.tipo_servicio,
+        s.descripcion,
       ].filter(Boolean).join(' · '),
-      observaciones:  notasMap.servicio[s.ordenes_servicio.id] ?? 'Gastos de PASS Rent a Car',
+      observaciones:  notasMap.servicio[s.id] ?? 'Gastos de PASS Rent a Car',
     }))
 
     const todos = [...filasDanos, ...filasServicios]
-      .sort((a, b) => new Date(a.fechaIngreso) - new Date(b.fechaIngreso))
+      .sort((a, b) => new Date(a.fechaRegistro) - new Date(b.fechaRegistro))
 
     setFilas(todos)
     setLoading(false)
@@ -210,14 +225,15 @@ export default function ReporteDiario() {
   }
 
   function exportarCSV() {
-    const headers = ['No','Placa','Tipo veh.','Registro','Taller','Ingreso','Est. salida','Días','Etapa checking','Motivo','Observaciones']
+    const headers = ['No','Placa','Tipo veh.','Registro','Ubicación','Taller','F. Registro','Est. salida','Días','Etapa checking','Motivo','Observaciones']
     const lines = filasFiltradas.map((f, idx) => [
       idx + 1,
       f.placa,
       f.tipoVehiculo,
       f.tipoRegistro === 'dano' ? 'Daño' : 'Servicio',
+      `"${(f.ubicacion || '').replace(/"/g, '""')}"`,
       f.taller,
-      f.fechaIngreso ?? '',
+      f.fechaRegistro ?? '',
       f.fechaEstSalida ?? '',
       f.dias,
       f.checking ? (CHECKING_LABELS[f.checking] ?? f.checking) : '',
@@ -255,7 +271,7 @@ export default function ReporteDiario() {
           <ClipboardList size={18} className="text-red-600" />
           <div>
             <h2 className="font-semibold text-gray-900 text-sm">Reporte Diario</h2>
-            <p className="text-xs text-gray-500">Vehículos actualmente en taller</p>
+            <p className="text-xs text-gray-500">Vehículos no disponibles para renta (daños y servicios activos)</p>
           </div>
         </div>
         <div className="flex items-center gap-2 no-print">
@@ -336,8 +352,9 @@ export default function ReporteDiario() {
               <th className="px-3 py-2 font-medium">Placa</th>
               <th className="px-3 py-2 font-medium">Tipo</th>
               <th className="px-3 py-2 font-medium">Registro</th>
+              <th className="px-3 py-2 font-medium">Ubicación</th>
               <th className="px-3 py-2 font-medium">Taller</th>
-              <th className="px-3 py-2 font-medium">Ingreso</th>
+              <th className="px-3 py-2 font-medium">F. Registro</th>
               <th className="px-3 py-2 font-medium">Est. salida</th>
               <th className="px-3 py-2 font-medium text-center">Días</th>
               <th className="px-3 py-2 font-medium">Etapa checking</th>
@@ -349,7 +366,7 @@ export default function ReporteDiario() {
             {loading ? (
               Array.from({ length: 3 }).map((_, i) => (
                 <tr key={i}>
-                  {Array.from({ length: 11 }).map((_, j) => (
+                  {Array.from({ length: 12 }).map((_, j) => (
                     <td key={j} className="px-3 py-2">
                       <div className="h-3 bg-gray-100 rounded animate-pulse" />
                     </td>
@@ -358,7 +375,7 @@ export default function ReporteDiario() {
               ))
             ) : filasFiltradas.length === 0 ? (
               <tr>
-                <td colSpan={11} className="px-3 py-10 text-center text-gray-400 text-sm italic">
+                <td colSpan={12} className="px-3 py-10 text-center text-gray-400 text-sm italic">
                   No hay vehículos en taller en este mes con los filtros seleccionados.
                 </td>
               </tr>
@@ -381,8 +398,9 @@ export default function ReporteDiario() {
                       {f.tipoRegistro === 'dano' ? 'Daño' : 'Servicio'}
                     </span>
                   </td>
+                  <td className="px-3 py-2 text-gray-700 whitespace-nowrap" title={f.ubicacion}>{f.ubicacion}</td>
                   <td className="px-3 py-2 text-gray-700">{f.taller}</td>
-                  <td className="px-3 py-2 text-gray-600 whitespace-nowrap">{fmtDate(f.fechaIngreso)}</td>
+                  <td className="px-3 py-2 text-gray-600 whitespace-nowrap">{fmtDate(f.fechaRegistro)}</td>
                   <td className="px-3 py-2 text-gray-600 whitespace-nowrap">{fmtDate(f.fechaEstSalida)}</td>
                   <td className="px-3 py-2 text-center">
                     <span className="inline-flex items-center gap-1.5 font-medium text-gray-800">
