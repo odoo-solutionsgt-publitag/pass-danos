@@ -92,14 +92,18 @@ export async function exportarReporteExcel({ filas, info, nombreArchivo }) {
     { width: 40 }, // L — Observaciones
   ]
 
-  // ── Headers (fila 7) ──────────────────────────────────────────
+  // ── Headers (fila 7) — doble línea con \n + wrapText ────────
   const headers = [
-    '#', 'Placa', 'Tipo vehículo', 'Registro', 'Ubicación', 'Taller',
-    'F. Registro', 'Est. salida', 'Días', 'Etapa checking',
+    '#', 'Placa', 'Tipo vehículo', 'Registro', 'Ubicación',
+    'Taller\nAsignado',
+    'Fecha\nRegistro',
+    'Fecha Aprox.\nIngreso',
+    'Días en\nTaller',
+    'Etapa checking',
     'Motivo', 'Observaciones',
   ]
   ws.getRow(7).values = headers
-  ws.getRow(7).height = 22
+  ws.getRow(7).height = 32
   ws.getRow(7).eachCell(cell => {
     cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FFFFFFFF' } }
     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE53935' } }
@@ -122,6 +126,8 @@ export async function exportarReporteExcel({ filas, info, nombreArchivo }) {
   const colorRegistroTexto = (tipo) => tipo === 'dano' ? 'FF991B1B' : 'FF334155'
 
   filas.forEach((f, idx) => {
+    const diasPos = f.dias ?? 0
+    const diasNeg = diasPos > 0 ? -diasPos : 0
     const r = ws.addRow([
       idx + 1,
       f.placa,
@@ -131,7 +137,7 @@ export async function exportarReporteExcel({ filas, info, nombreArchivo }) {
       f.taller || '',
       formatDate(f.fechaRegistro)  ?? '',
       formatDate(f.fechaEstSalida) ?? '',
-      f.dias ?? 0,
+      diasNeg,
       f.checking ? (CHECKING_LABELS[f.checking] ?? f.checking) : '',
       f.motivo || '',
       f.observaciones || '',

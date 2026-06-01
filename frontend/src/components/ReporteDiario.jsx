@@ -390,10 +390,10 @@ export default function ReporteDiario() {
               <th className="px-3 py-2 font-medium">Tipo</th>
               <th className="px-3 py-2 font-medium">Registro</th>
               <th className="px-3 py-2 font-medium">Ubicación</th>
-              <th className="px-3 py-2 font-medium">Taller</th>
-              <th className="px-3 py-2 font-medium">F. Registro</th>
-              <th className="px-3 py-2 font-medium">Est. salida</th>
-              <th className="px-3 py-2 font-medium text-center">Días</th>
+              <th className="px-3 py-2 font-medium leading-tight">Taller<br/>Asignado</th>
+              <th className="px-3 py-2 font-medium leading-tight">Fecha<br/>Registro</th>
+              <th className="px-3 py-2 font-medium leading-tight">Fecha Aprox.<br/>Ingreso</th>
+              <th className="px-3 py-2 font-medium text-center leading-tight">Días en<br/>Taller</th>
               <th className="px-3 py-2 font-medium">Etapa checking</th>
               <th className="px-3 py-2 font-medium">Motivo</th>
               <th className="px-3 py-2 font-medium">Observaciones</th>
@@ -441,7 +441,7 @@ export default function ReporteDiario() {
                   <td className="px-3 py-2 text-gray-600 whitespace-nowrap">{fmtDate(f.fechaEstSalida)}</td>
                   <td className="px-3 py-2 text-center">
                     <span className="inline-flex items-center gap-1.5 font-medium text-gray-800">
-                      {f.dias}
+                      {(f.dias ?? 0) > 0 ? `-${f.dias}` : (f.dias ?? 0)}
                       <span className={`inline-block w-2.5 h-2.5 rounded-full ${semaforoColor(f.dias)}`} />
                     </span>
                   </td>
