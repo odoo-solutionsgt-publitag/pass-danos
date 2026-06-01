@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ClipboardList, Printer, Download } from 'lucide-react'
+import { ClipboardList, Printer, FileSpreadsheet } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { formatDate as fmtDateLib } from '../lib/fecha'
 import { CHECKING_LABELS, CHECKING_COLORS } from './InfoOperacional'
+import { exportarReporteExcel } from '../lib/exportarReporteExcel'
 
 const TIPO_DANO_LABELS = {
   choque_frontal: 'Choque frontal',
@@ -50,38 +51,42 @@ function semaforoColor(dias) {
   return 'bg-red-500'
 }
 
-function listarUltimosMeses(n = 12) {
-  const out = []
-  const d = new Date()
-  for (let i = 0; i < n; i++) {
-    out.push({
-      year:  d.getFullYear(),
-      month: d.getMonth() + 1,
-      label: d.toLocaleDateString('es-GT', { month: 'long', year: 'numeric' }),
-    })
-    d.setMonth(d.getMonth() - 1)
-  }
-  return out
+const MESES_LABEL = [
+  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
+]
+
+function listarAniosDisponibles() {
+  const inicio = 2026
+  const fin = new Date().getFullYear()
+  const anios = []
+  for (let y = fin; y >= inicio; y--) anios.push(y)
+  return anios.length ? anios : [2026]
 }
 
-function rangoMes({ year, month }) {
-  const inicio = new Date(year, month - 1, 1).toISOString().slice(0, 10)
-  const fin    = new Date(year, month, 0).toISOString().slice(0, 10)
-  return { inicio, fin }
+function rangoFecha({ year, month }) {
+  if (month) {
+    const inicio = new Date(year, month - 1, 1).toISOString().slice(0, 10)
+    const fin    = new Date(year, month, 0).toISOString().slice(0, 10)
+    return { inicio, fin }
+  }
+  return {
+    inicio: new Date(year, 0,  1).toISOString().slice(0, 10),
+    fin:    new Date(year, 11, 31).toISOString().slice(0, 10),
+  }
 }
 
 export default function ReporteDiario() {
   const navigate = useNavigate()
-  // mes = null → "Ver Todos" (sin filtro de fecha); { year, month } → mes específico
-  const [mes, setMes]                 = useState(null)
+  const aniosDisponibles = useMemo(() => listarAniosDisponibles(), [])
+  const [anio, setAnio]               = useState(aniosDisponibles[0])
+  const [mes, setMes]                 = useState(null)  // null = Todos los meses del año
   const [incluyeServicios, setIncSv]  = useState(true)
   const [incluyeDanos, setIncDn]      = useState(true)
   const [filas, setFilas]             = useState([])
   const [loading, setLoading]         = useState(true)
 
-  const meses = useMemo(() => listarUltimosMeses(12), [])
-
-  useEffect(() => { load() }, [mes])
+  useEffect(() => { load() }, [anio, mes])
 
   async function load() {
     setLoading(true)
@@ -110,12 +115,10 @@ export default function ReporteDiario() {
       .not('estado', 'in', '("completado","cancelado")')
       .order('fecha_programada')
 
-    // Filtro de mes solo si se eligió uno específico (mes !== null = Ver Todos)
-    if (mes) {
-      const { inicio, fin } = rangoMes(mes)
-      danosQ     = danosQ.gte('fecha_dano', inicio).lte('fecha_dano', fin)
-      serviciosQ = serviciosQ.gte('fecha_programada', inicio).lte('fecha_programada', fin)
-    }
+    // Filtro de fecha: año (siempre) + mes (opcional)
+    const { inicio, fin } = rangoFecha({ year: anio, month: mes })
+    danosQ     = danosQ.gte('fecha_dano',       inicio).lte('fecha_dano',       fin)
+    serviciosQ = serviciosQ.gte('fecha_programada', inicio).lte('fecha_programada', fin)
 
     const [{ data: danos }, { data: servicios }] = await Promise.all([danosQ, serviciosQ])
 
@@ -205,7 +208,7 @@ export default function ReporteDiario() {
     }))
 
     const todos = [...filasDanos, ...filasServicios]
-      .sort((a, b) => new Date(a.fechaRegistro) - new Date(b.fechaRegistro))
+      .sort((a, b) => new Date(b.fechaRegistro) - new Date(a.fechaRegistro))
 
     setFilas(todos)
     setLoading(false)
@@ -222,32 +225,42 @@ export default function ReporteDiario() {
     else navigate(`/servicios/${fila.registroId}`)
   }
 
-  function exportarCSV() {
-    const headers = ['No','Placa','Tipo veh.','Registro','Ubicación','Taller','F. Registro','Est. salida','Días','Etapa checking','Motivo','Observaciones']
-    const lines = filasFiltradas.map((f, idx) => [
-      idx + 1,
-      f.placa,
-      f.tipoVehiculo,
-      f.tipoRegistro === 'dano' ? 'Daño' : 'Servicio',
-      `"${(f.ubicacion || '').replace(/"/g, '""')}"`,
-      f.taller,
-      f.fechaRegistro ?? '',
-      f.fechaEstSalida ?? '',
-      f.dias,
-      f.checking ? (CHECKING_LABELS[f.checking] ?? f.checking) : '',
-      `"${(f.motivo || '').replace(/"/g, '""')}"`,
-      `"${(f.observaciones || '').replace(/"/g, '""')}"`,
-    ].join(','))
-    const csv = [headers.join(','), ...lines].join('\n')
-    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `reporte-diario-${new Date().toISOString().slice(0,10)}.csv`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
+  // Etiqueta del título según combinación de filtros (sin la palabra "Filtros")
+  function tituloReporte() {
+    if (incluyeServicios && incluyeDanos)  return 'Registro de Daños/Servicios'
+    if (incluyeDanos)                       return 'Registro de Daños'
+    if (incluyeServicios)                   return 'Registro de Servicios'
+    return 'Registro Diario'
+  }
+
+  function fechaLabel() {
+    if (!mes) return 'Fechas: Todas'
+    return `Fecha: Mes de ${MESES_LABEL[mes - 1]} ${anio}`
+  }
+
+  function nombreArchivo() {
+    const hoy = new Date().toISOString().slice(0, 10)
+    let sufijo = ''
+    if (incluyeDanos && !incluyeServicios)     sufijo = '-danos'
+    if (incluyeServicios && !incluyeDanos)     sufijo = '-servicios'
+    return `reporte-diario${sufijo}-${hoy}`
+  }
+
+  async function exportarExcel() {
+    try {
+      await exportarReporteExcel({
+        filas: filasFiltradas,
+        info: {
+          titulo:     tituloReporte(),
+          fechaLabel: fechaLabel(),
+          total:      filasFiltradas.length,
+        },
+        nombreArchivo: nombreArchivo(),
+      })
+    } catch (e) {
+      console.error('[exportarExcel]', e)
+      alert('No se pudo generar el Excel: ' + e.message)
+    }
   }
 
   function imprimir() {
@@ -264,7 +277,24 @@ export default function ReporteDiario() {
     <div className="reporte-diario bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
 
       {/* Header */}
-      <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between flex-wrap gap-3">
+      {/* Header solo-print: logo + título + filtros + total */}
+      <div className="hidden print:block px-5 py-3 border-b border-gray-200">
+        <div className="flex items-start gap-4">
+          <img src="/pass-35-logo.png" alt="Pass" className="h-14 object-contain" />
+          <div className="flex-1">
+            <h1 className="text-base font-bold text-gray-900">PASS RENT A CAR GUATEMALA</h1>
+            <p className="text-sm font-semibold text-red-700">{tituloReporte()}</p>
+            <p className="text-xs text-gray-600 mt-0.5">
+              {fechaLabel()} · Total: {filasFiltradas.length}
+            </p>
+            <p className="text-[11px] text-gray-400 mt-0.5">
+              Generado: {new Date().toLocaleString('es-GT', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between flex-wrap gap-3 no-print">
         <div className="flex items-center gap-2">
           <ClipboardList size={18} className="text-red-600" />
           <div>
@@ -272,7 +302,7 @@ export default function ReporteDiario() {
             <p className="text-xs text-gray-500">Vehículos no disponibles para renta (daños y servicios activos)</p>
           </div>
         </div>
-        <div className="flex items-center gap-2 no-print">
+        <div className="flex items-center gap-2">
           <button
             onClick={imprimir}
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50"
@@ -281,12 +311,12 @@ export default function ReporteDiario() {
             Imprimir
           </button>
           <button
-            onClick={exportarCSV}
+            onClick={exportarExcel}
             disabled={filasFiltradas.length === 0}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 disabled:opacity-40"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs border border-green-200 bg-green-50 text-green-700 rounded-lg hover:bg-green-100 disabled:opacity-40"
           >
-            <Download size={13} />
-            Exportar CSV
+            <FileSpreadsheet size={13} />
+            Exportar Excel
           </button>
         </div>
       </div>
@@ -313,24 +343,28 @@ export default function ReporteDiario() {
         </label>
 
         <div className="flex items-center gap-2">
+          <span className="text-gray-500">Año:</span>
+          <select
+            value={anio}
+            onChange={e => setAnio(Number(e.target.value))}
+            className="border border-gray-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-red-400 bg-white"
+          >
+            {aniosDisponibles.map(y => (
+              <option key={y} value={y}>{y}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="flex items-center gap-2">
           <span className="text-gray-500">Mes:</span>
           <select
-            value={mes ? `${mes.year}-${mes.month}` : 'all'}
-            onChange={e => {
-              if (e.target.value === 'all') {
-                setMes(null)
-              } else {
-                const [year, month] = e.target.value.split('-').map(Number)
-                setMes({ year, month })
-              }
-            }}
-            className="border border-gray-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-red-400 bg-white capitalize"
+            value={mes ?? 'all'}
+            onChange={e => setMes(e.target.value === 'all' ? null : Number(e.target.value))}
+            className="border border-gray-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-red-400 bg-white"
           >
-            <option value="all">Ver Todos</option>
-            {meses.map(m => (
-              <option key={`${m.year}-${m.month}`} value={`${m.year}-${m.month}`} className="capitalize">
-                {m.label}
-              </option>
+            <option value="all">Todos</option>
+            {MESES_LABEL.map((label, idx) => (
+              <option key={idx + 1} value={idx + 1}>{label}</option>
             ))}
           </select>
         </div>
