@@ -50,11 +50,6 @@ function semaforoColor(dias) {
   return 'bg-red-500'
 }
 
-function mesActual() {
-  const d = new Date()
-  return { year: d.getFullYear(), month: d.getMonth() + 1 }
-}
-
 function listarUltimosMeses(n = 12) {
   const out = []
   const d = new Date()
@@ -77,7 +72,8 @@ function rangoMes({ year, month }) {
 
 export default function ReporteDiario() {
   const navigate = useNavigate()
-  const [mes, setMes]                 = useState(mesActual())
+  // mes = null → "Ver Todos" (sin filtro de fecha); { year, month } → mes específico
+  const [mes, setMes]                 = useState(null)
   const [incluyeServicios, setIncSv]  = useState(true)
   const [incluyeDanos, setIncDn]      = useState(true)
   const [filas, setFilas]             = useState([])
@@ -89,10 +85,9 @@ export default function ReporteDiario() {
 
   async function load() {
     setLoading(true)
-    const { inicio, fin } = rangoMes(mes)
 
-    // ── Daños activos (ficha creada en el mes, no cerrados/anulados, no disponibles para renta) ──
-    const danosQ = supabase
+    // ── Daños activos (no cerrados/anulados, no disponibles para renta) ──
+    let danosQ = supabase
       .from('siniestros')
       .select(`
         id, numero, placa, tipo_vehiculo, tipo_dano, descripcion, forma_pago,
@@ -102,12 +97,10 @@ export default function ReporteDiario() {
       `)
       .not('estado', 'in', '("cerrado","anulado")')
       .eq('disponible_renta', false)
-      .gte('fecha_dano', inicio)
-      .lte('fecha_dano', fin)
       .order('fecha_dano')
 
-    // ── Servicios activos (ficha programada en el mes, no completados/cancelados) ──
-    const serviciosQ = supabase
+    // ── Servicios activos (no completados/cancelados) ──
+    let serviciosQ = supabase
       .from('ordenes_servicio')
       .select(`
         id, numero, placa, tipo_vehiculo, tipo_servicio, descripcion,
@@ -115,9 +108,14 @@ export default function ReporteDiario() {
         talleres(nombre)
       `)
       .not('estado', 'in', '("completado","cancelado")')
-      .gte('fecha_programada', inicio)
-      .lte('fecha_programada', fin)
       .order('fecha_programada')
+
+    // Filtro de mes solo si se eligió uno específico (mes !== null = Ver Todos)
+    if (mes) {
+      const { inicio, fin } = rangoMes(mes)
+      danosQ     = danosQ.gte('fecha_dano', inicio).lte('fecha_dano', fin)
+      serviciosQ = serviciosQ.gte('fecha_programada', inicio).lte('fecha_programada', fin)
+    }
 
     const [{ data: danos }, { data: servicios }] = await Promise.all([danosQ, serviciosQ])
 
@@ -317,13 +315,18 @@ export default function ReporteDiario() {
         <div className="flex items-center gap-2">
           <span className="text-gray-500">Mes:</span>
           <select
-            value={`${mes.year}-${mes.month}`}
+            value={mes ? `${mes.year}-${mes.month}` : 'all'}
             onChange={e => {
-              const [year, month] = e.target.value.split('-').map(Number)
-              setMes({ year, month })
+              if (e.target.value === 'all') {
+                setMes(null)
+              } else {
+                const [year, month] = e.target.value.split('-').map(Number)
+                setMes({ year, month })
+              }
             }}
             className="border border-gray-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-red-400 bg-white capitalize"
           >
+            <option value="all">Ver Todos</option>
             {meses.map(m => (
               <option key={`${m.year}-${m.month}`} value={`${m.year}-${m.month}`} className="capitalize">
                 {m.label}
@@ -417,10 +420,10 @@ export default function ReporteDiario() {
                       <span className="text-gray-300 text-xs">—</span>
                     )}
                   </td>
-                  <td className="px-3 py-2 text-gray-700 max-w-[220px] truncate" title={f.motivo}>
+                  <td className="px-3 py-2 text-gray-700 max-w-[40ch] break-words align-top">
                     {f.motivo || '—'}
                   </td>
-                  <td className="px-3 py-2 text-gray-700 max-w-[260px] truncate" title={f.observaciones}>
+                  <td className="px-3 py-2 text-gray-700 max-w-[40ch] break-words align-top">
                     {f.observaciones}
                   </td>
                 </tr>
