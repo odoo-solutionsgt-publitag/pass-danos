@@ -12,6 +12,7 @@ import DocumentosSection from '../components/DocumentosSection'
 import ChecklistCierre from '../components/ChecklistCierre'
 import FechasTaller from '../components/FechasTaller'
 import HistorialCambios from '../components/HistorialCambios'
+import BitacoraActualizaciones from '../components/BitacoraActualizaciones'
 
 // ── Constantes ────────────────────────────────────────────────
 
@@ -634,6 +635,9 @@ export default function ServicioDetalle() {
             </ol>
           )}
         </div>
+
+        {/* ── Bitácora de actualización ───────────────────────── */}
+        <BitacoraActualizaciones tipo="servicio" registroId={orden.id} />
 
         {/* ── Historial de cambios (audit_log) ─────────────────── */}
         <HistorialCambios tabla="ordenes_servicio" filaId={orden.id} />

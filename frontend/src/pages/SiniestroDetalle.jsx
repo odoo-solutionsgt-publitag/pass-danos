@@ -15,6 +15,7 @@ import DocumentosSection from '../components/DocumentosSection'
 import ChecklistCierre from '../components/ChecklistCierre'
 import FechasTaller from '../components/FechasTaller'
 import HistorialCambios from '../components/HistorialCambios'
+import BitacoraActualizaciones from '../components/BitacoraActualizaciones'
 
 // ── Labels y colores ──────────────────────────────────────────
 
@@ -646,6 +647,9 @@ export default function SiniestroDetalle() {
           numero={siniestro.numero}
           tiposSugeridos={['cotizacion_pdf', 'proforma_pdf', 'foto_dano', 'factura', 'comprobante_pago', 'avaluo', 'otro']}
         />
+
+        {/* ── Bitácora de actualización (antes del historial) ──── */}
+        <BitacoraActualizaciones tipo="dano" registroId={siniestro.id} />
 
         {/* ── Historial ───────────────────────────────────────── */}
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
