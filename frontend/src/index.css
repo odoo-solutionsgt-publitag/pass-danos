@@ -21,4 +21,41 @@
   html {
     font-size: 16px;
   }
+  .no-print {
+    display: none !important;
+  }
+
+  /* Modo "Imprimir solo el Reporte Diario": oculta todo y deja
+     solo el componente con clase .reporte-diario visible. */
+  body.printing-reporte-diario * {
+    visibility: hidden;
+  }
+  body.printing-reporte-diario .reporte-diario,
+  body.printing-reporte-diario .reporte-diario * {
+    visibility: visible;
+  }
+  body.printing-reporte-diario .reporte-diario {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    box-shadow: none !important;
+    border: none !important;
+  }
+  body.printing-reporte-diario .reporte-diario table {
+    font-size: 10px;
+    page-break-inside: auto;
+  }
+  body.printing-reporte-diario .reporte-diario tr {
+    page-break-inside: avoid;
+  }
+}
+
+@page printing-reporte-diario-page {
+  size: A4 landscape;
+  margin: 10mm;
+}
+
+body.printing-reporte-diario {
+  page: printing-reporte-diario-page;
 }

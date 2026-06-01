@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { AlertTriangle, FileText, Wrench, Car, Clock } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { siniestrosQuery } from '../lib/queries'
+import ReporteDiario from '../components/ReporteDiario'
 
 const ESTADO_LABELS = {
   registrado: 'Registrado',
@@ -106,6 +107,8 @@ export default function Dashboard() {
         <KpiCard title="Vehículos en reparación" value={kpis.enReparacion} icon={Car} color="bg-orange-500" loading={loading} />
         <KpiCard title="Servicios en curso" value={kpis.serviciosEnCurso} icon={Wrench} color="bg-blue-500" loading={loading} />
       </div>
+
+      <ReporteDiario />
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         <div className="xl:col-span-2 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
