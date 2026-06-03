@@ -553,6 +553,18 @@ export default function SiniestroDetalle() {
         {/* ── Información operacional ─────────────────────────── */}
         <InfoOperacional siniestro={siniestro} onUpdate={loadAll} />
 
+        {/* ── Fechas de taller ────────────────────────────────── */}
+        <FechasTaller
+          tabla="siniestros"
+          registroId={siniestro.id}
+          valores={{
+            fecha_entrega_taller:   siniestro.fecha_entrega_taller,
+            fecha_estimada_entrega: siniestro.fecha_estimada_entrega,
+            fecha_real_entrega:     siniestro.fecha_real_entrega,
+          }}
+          onUpdate={() => loadAll()}
+        />
+
         {/*
           Cotizaciones (sección activa de gestión).
           - Modo Única: visible solo en estado 'cotizando' (al aprobar pasa a proforma_emitida y desaparece)
@@ -632,18 +644,6 @@ export default function SiniestroDetalle() {
             </p>
           </div>
         )}
-
-        {/* ── Fechas de taller ────────────────────────────────── */}
-        <FechasTaller
-          tabla="siniestros"
-          registroId={siniestro.id}
-          valores={{
-            fecha_entrega_taller:   siniestro.fecha_entrega_taller,
-            fecha_estimada_entrega: siniestro.fecha_estimada_entrega,
-            fecha_real_entrega:     siniestro.fecha_real_entrega,
-          }}
-          onUpdate={() => loadAll()}
-        />
 
         {/* ── Checklist de cierre ─────────────────────────────── */}
         {['reparado', 'en_cobro', 'cerrado'].includes(estado) && (
