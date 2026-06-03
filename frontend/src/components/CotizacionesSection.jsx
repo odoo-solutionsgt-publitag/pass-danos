@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Trash2, Check, X, AlertTriangle } from 'lucide-react'
+import { Plus, Trash2, Check, X, AlertTriangle, Layers, Target, RotateCcw } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import DocumentosSection from './DocumentosSection'
 import { usePermisos } from '../hooks/usePermisos'
@@ -146,20 +146,60 @@ export default function CotizacionesSection({ siniestro, onUpdate }) {
   async function handleAprobar(cotId, tallerId) {
     setSaving(true); setError('')
     try {
-      const cot = cotizaciones.find(c => c.id === cotId)
-      const otrosIds = cotizaciones.filter(c => c.id !== cotId).map(c => c.id)
-
       await supabase.from('cotizaciones').update({ estado: 'aprobada' }).eq('id', cotId)
-      if (otrosIds.length) {
-        await supabase.from('cotizaciones').update({ estado: 'rechazada' }).in('id', otrosIds)
+
+      if (tipoCotizacion === 'unica') {
+        // Modo única: rechazar todas las demás
+        const otrosIds = cotizaciones.filter(c => c.id !== cotId).map(c => c.id)
+        if (otrosIds.length) {
+          await supabase.from('cotizaciones').update({ estado: 'rechazada' }).in('id', otrosIds)
+        }
+        // Solo asignar taller_id en modo única
+        const updates = { taller_id: tallerId }
+        if (siniestro.estado === 'cotizando') updates.estado = 'proforma_emitida'
+        await supabase.from('siniestros').update(updates).eq('id', siniestro.id)
+      } else {
+        // Modo múltiple: no se tocan las demás. costo_pass se recalcula vía trigger SQL.
+        // taller_id queda NULL (no hay taller único).
+        if (siniestro.estado === 'cotizando') {
+          await supabase.from('siniestros').update({
+            estado: 'proforma_emitida',
+            taller_id: null,
+          }).eq('id', siniestro.id)
+        }
       }
-      await supabase.from('siniestros').update({
-        estado:        'proforma_emitida',
-        taller_id:     tallerId,
-        costo_pass:    cot?.total_general ?? 0,
-      }).eq('id', siniestro.id)
 
       await loadAll()
+      onUpdate()
+    } catch (e) { setError(e.message) }
+    finally { setSaving(false) }
+  }
+
+  // ── Quitar aprobación (solo modo múltiple) ─────────────────
+
+  async function handleQuitarAprobacion(cotId) {
+    setSaving(true); setError('')
+    try {
+      // Volver a 'recibida'. El trigger recalcula costo_pass = SUM de aprobadas restantes.
+      await supabase.from('cotizaciones').update({ estado: 'recibida' }).eq('id', cotId)
+      await loadAll()
+      onUpdate()
+    } catch (e) { setError(e.message) }
+    finally { setSaving(false) }
+  }
+
+  // ── Cambio de modo de cotización ──────────────────────────
+
+  async function handleTipoCotizacionChange(nuevoTipo) {
+    if (nuevoTipo === tipoCotizacion) return
+    if (modoBloqueado) return
+    setSaving(true); setError('')
+    try {
+      const { error: err } = await supabase
+        .from('siniestros')
+        .update({ tipo_cotizacion: nuevoTipo })
+        .eq('id', siniestro.id)
+      if (err) throw err
       onUpdate()
     } catch (e) { setError(e.message) }
     finally { setSaving(false) }
@@ -169,18 +209,34 @@ export default function CotizacionesSection({ siniestro, onUpdate }) {
 
   if (loading) return <p className="text-sm text-gray-400 py-2">Cargando cotizaciones...</p>
 
+  const tipoCotizacion    = siniestro.tipo_cotizacion || 'unica'
+  const esModoMultiple    = tipoCotizacion === 'multiple'
+  // Modo bloqueado cuando existe al menos 1 cotización con líneas
+  const modoBloqueado     = cotizaciones.some(c => (c.cotizacion_lineas ?? []).length > 0)
   const hayAprobada       = cotizaciones.some(c => c.estado === 'aprobada')
   const cotsConLineas     = cotizaciones.filter(c => (c.cotizacion_lineas ?? []).length > 0 && c.estado !== 'rechazada')
-  const minTotal          = cotsConLineas.length > 1
+  const minTotal          = !esModoMultiple && cotsConLineas.length > 1
     ? Math.min(...cotsConLineas.map(c => Number(c.total_general) || 0))
     : null
+  const sumaAprobadas     = cotizaciones
+    .filter(c => c.estado === 'aprobada')
+    .reduce((acc, c) => acc + (Number(c.total_general) || 0), 0)
 
   return (
     <div className="space-y-4">
 
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h4 className="text-sm font-semibold text-gray-700">Cotizaciones</h4>
+        <div className="flex items-center gap-2 flex-wrap">
+          <h4 className="text-sm font-semibold text-gray-700">Cotizaciones</h4>
+          <span className={`text-xs px-2 py-0.5 rounded-full font-medium border ${
+            esModoMultiple
+              ? 'bg-purple-50 border-purple-200 text-purple-700'
+              : 'bg-amber-50 border-amber-200 text-amber-700'
+          }`}>
+            {esModoMultiple ? <><Layers size={10} className="inline mr-1" />Modo: Múltiple</> : <><Target size={10} className="inline mr-1" />Modo: Única</>}
+          </span>
+        </div>
         {puedeCrear && talleres.length > 0 && (
           <button
             onClick={() => setShowSolicitar(s => !s)}
@@ -191,6 +247,63 @@ export default function CotizacionesSection({ siniestro, onUpdate }) {
           </button>
         )}
       </div>
+
+      {/* Selector de modo de cotización */}
+      {puedeEditar && (
+        <div className="border border-gray-200 rounded-xl p-4 space-y-3 bg-gray-50/40">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-semibold text-gray-700">Modo de cotización</p>
+            {modoBloqueado && (
+              <span className="text-[11px] text-amber-700 flex items-center gap-1">
+                <AlertTriangle size={11} />
+                Bloqueado — ya hay cotizaciones con líneas
+              </span>
+            )}
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => handleTipoCotizacionChange('unica')}
+              disabled={modoBloqueado || saving}
+              className={`text-left p-3 rounded-lg border transition-colors ${
+                tipoCotizacion === 'unica'
+                  ? 'border-amber-400 bg-amber-50'
+                  : 'border-gray-200 hover:border-gray-300 bg-white'
+              } ${modoBloqueado ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}
+            >
+              <div className="flex items-center gap-2 mb-1">
+                <Target size={13} className={tipoCotizacion === 'unica' ? 'text-amber-700' : 'text-gray-400'} />
+                <span className={`text-sm font-semibold ${tipoCotizacion === 'unica' ? 'text-amber-800' : 'text-gray-700'}`}>
+                  Cotización Única
+                </span>
+              </div>
+              <p className="text-xs text-gray-500 leading-snug">
+                Se piden a varios talleres, se elige UNA ganadora y las demás quedan rechazadas. El total de la ganadora es el costo Pass.
+              </p>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleTipoCotizacionChange('multiple')}
+              disabled={modoBloqueado || saving}
+              className={`text-left p-3 rounded-lg border transition-colors ${
+                tipoCotizacion === 'multiple'
+                  ? 'border-purple-400 bg-purple-50'
+                  : 'border-gray-200 hover:border-gray-300 bg-white'
+              } ${modoBloqueado ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}
+            >
+              <div className="flex items-center gap-2 mb-1">
+                <Layers size={13} className={tipoCotizacion === 'multiple' ? 'text-purple-700' : 'text-gray-400'} />
+                <span className={`text-sm font-semibold ${tipoCotizacion === 'multiple' ? 'text-purple-800' : 'text-gray-700'}`}>
+                  Cotización Múltiple
+                </span>
+              </div>
+              <p className="text-xs text-gray-500 leading-snug">
+                Se aprueban varias cotizaciones que se complementan (mano de obra + repuestos + polarizado, etc.). El costo Pass es la SUMA de todas las aprobadas.
+              </p>
+            </button>
+          </div>
+        </div>
+      )}
 
       {error && (
         <p className="text-xs text-red-600 bg-red-50 px-3 py-2 rounded-lg">{error}</p>
@@ -303,7 +416,20 @@ export default function CotizacionesSection({ siniestro, onUpdate }) {
                 </button>
               )}
               {editableAprobada && (
-                <span className="text-xs text-green-700 font-medium">✓ Cotización aprobada</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-green-700 font-medium">✓ Cotización aprobada</span>
+                  {esModoMultiple && puedeEditar && (
+                    <button
+                      onClick={() => handleQuitarAprobacion(cot.id)}
+                      disabled={saving}
+                      className="flex items-center gap-1 px-2 py-1 text-[11px] border border-gray-300 text-gray-600 rounded hover:bg-gray-50 disabled:opacity-50"
+                      title="Quitar aprobación — la suma del costo Pass se recalcula"
+                    >
+                      <RotateCcw size={10} />
+                      Quitar aprobación
+                    </button>
+                  )}
+                </div>
               )}
             </div>
 
@@ -441,8 +567,26 @@ export default function CotizacionesSection({ siniestro, onUpdate }) {
         )
       })}
 
-      {/* Comparador lado a lado */}
-      {cotsConLineas.length >= 2 && (
+      {/* Suma de aprobadas — solo modo múltiple */}
+      {esModoMultiple && hayAprobada && (
+        <div className="border border-purple-200 rounded-xl overflow-hidden">
+          <div className="bg-purple-50 px-4 py-3 flex items-center justify-between">
+            <div>
+              <h4 className="text-sm font-semibold text-purple-800 flex items-center gap-1.5">
+                <Layers size={14} />
+                Suma de cotizaciones aprobadas
+              </h4>
+              <p className="text-xs text-purple-600 mt-0.5">
+                {cotizaciones.filter(c => c.estado === 'aprobada').length} cotización(es) aprobada(s)
+              </p>
+            </div>
+            <span className="text-lg font-bold text-purple-900">{fmt(sumaAprobadas)}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Comparador lado a lado — solo modo única */}
+      {!esModoMultiple && cotsConLineas.length >= 2 && (
         <div className="border border-blue-100 rounded-xl overflow-hidden">
           <div className="bg-blue-50 px-4 py-3">
             <h4 className="text-sm font-semibold text-blue-800">Comparador</h4>

@@ -21,7 +21,7 @@ function formatDate(iso) { return fmtDateLib(iso, { day: '2-digit', month: 'long
 export default function FichaSiniestroPrint() {
   const { id } = useParams()
   const [siniestro, setSiniestro] = useState(null)
-  const [cotizacion, setCotizacion] = useState(null)
+  const [aprobadas, setAprobadas] = useState([])
   const [ingresos, setIngresos] = useState([])
   const [loading, setLoading] = useState(true)
 
@@ -29,11 +29,11 @@ export default function FichaSiniestroPrint() {
     (async () => {
       const [{ data: s }, { data: c }, { data: i }] = await Promise.all([
         supabase.from('siniestros').select('*, talleres(nombre, contacto, telefono)').eq('id', id).single(),
-        supabase.from('cotizaciones').select('*, talleres(nombre), cotizacion_lineas(*)').eq('siniestro_id', id).eq('estado', 'aprobada').maybeSingle(),
+        supabase.from('cotizaciones').select('*, talleres(nombre), cotizacion_lineas(*)').eq('siniestro_id', id).eq('estado', 'aprobada').order('created_at'),
         supabase.from('taller_ingresos').select('*, talleres(nombre)').eq('siniestro_id', id).order('fecha_ingreso'),
       ])
       setSiniestro(s)
-      setCotizacion(c)
+      setAprobadas(c ?? [])
       setIngresos(i ?? [])
       setLoading(false)
     })()
@@ -49,7 +49,8 @@ export default function FichaSiniestroPrint() {
   if (loading) return <div className="p-10 text-center text-gray-500">Cargando ficha...</div>
   if (!siniestro) return <div className="p-10 text-center text-gray-500">Ficha no encontrada</div>
 
-  const lineas = cotizacion?.cotizacion_lineas ?? []
+  const esModoMultiple = siniestro.tipo_cotizacion === 'multiple'
+  const granTotal = aprobadas.reduce((acc, c) => acc + (Number(c.total_general) || 0), 0)
 
   return (
     <div className="ficha-print bg-white text-gray-900 max-w-[210mm] mx-auto p-8 print:p-6">
@@ -174,50 +175,88 @@ export default function FichaSiniestroPrint() {
         </div>
       </section>
 
-      {/* Proforma si existe */}
-      {cotizacion && (
-        <section className="border border-gray-200 rounded mb-5">
-          <h2 className="bg-red-600 text-white text-xs font-bold uppercase px-3 py-1.5 tracking-wider flex items-center justify-between">
-            <span>Proforma — {cotizacion.talleres?.nombre}{cotizacion.variante && <span className="ml-2 normal-case text-[10px] opacity-90">({cotizacion.variante})</span>}</span>
-            <span className="text-xs font-normal">{lineas.length} líneas</span>
-          </h2>
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="bg-gray-50 border-b border-gray-200">
-                <th className="text-left px-3 py-2 font-medium">Tipo</th>
-                <th className="text-left px-3 py-2 font-medium">Descripción</th>
-                <th className="text-right px-3 py-2 font-medium">Cant.</th>
-                <th className="text-right px-3 py-2 font-medium">P. Unit.</th>
-                <th className="text-right px-3 py-2 font-medium">Subtotal</th>
-              </tr>
-            </thead>
-            <tbody>
-              {lineas.map(l => (
-                <tr key={l.id} className="border-b border-gray-100">
-                  <td className="px-3 py-1.5 text-gray-500 capitalize">{l.tipo?.replace('_', ' ')}</td>
-                  <td className="px-3 py-1.5">{l.descripcion}</td>
-                  <td className="px-3 py-1.5 text-right">{l.cantidad}</td>
-                  <td className="px-3 py-1.5 text-right">{fmt(l.precio_unitario)}</td>
-                  <td className="px-3 py-1.5 text-right font-medium">{fmt(l.subtotal)}</td>
-                </tr>
-              ))}
-            </tbody>
-            <tfoot>
-              <tr className="bg-gray-50"><td colSpan={4} className="px-3 py-1.5 text-right">Repuestos</td><td className="px-3 py-1.5 text-right">{fmt(cotizacion.total_repuestos)}</td></tr>
-              <tr className="bg-gray-50"><td colSpan={4} className="px-3 py-1.5 text-right">Mano de obra</td><td className="px-3 py-1.5 text-right">{fmt(cotizacion.total_mano_obra)}</td></tr>
-              {Number(cotizacion.total_otros) > 0 && (
-                <tr className="bg-gray-50"><td colSpan={4} className="px-3 py-1.5 text-right">Otros</td><td className="px-3 py-1.5 text-right">{fmt(cotizacion.total_otros)}</td></tr>
-              )}
-              {Number(cotizacion.total_descuentos) !== 0 && (
-                <tr className="bg-gray-50"><td colSpan={4} className="px-3 py-1.5 text-right text-red-600">Descuentos</td><td className="px-3 py-1.5 text-right text-red-600">{fmt(cotizacion.total_descuentos)}</td></tr>
-              )}
-              <tr className="bg-red-50 border-t-2 border-red-600">
-                <td colSpan={4} className="px-3 py-2 text-right font-bold">Costo taller (Pass paga)</td>
-                <td className="px-3 py-2 text-right font-bold">{fmt(cotizacion.total_general)}</td>
-              </tr>
-            </tfoot>
-          </table>
-        </section>
+      {/* Proforma — render dual según modo */}
+      {aprobadas.length > 0 && (
+        <>
+          {/* Header del bloque */}
+          {esModoMultiple && (
+            <h2 className="bg-purple-700 text-white text-xs font-bold uppercase px-3 py-1.5 tracking-wider flex items-center justify-between mb-2 rounded-t">
+              <span>Proforma combinada — {aprobadas.length} cotizaciones aprobadas</span>
+              <span className="text-xs font-normal">Modo: Múltiple</span>
+            </h2>
+          )}
+
+          {/* Cada cotización aprobada (1 sola en modo única, N en modo múltiple) */}
+          {aprobadas.map(cot => {
+            const lineas = cot.cotizacion_lineas ?? []
+            return (
+              <section key={cot.id} className="border border-gray-200 rounded mb-3">
+                <h2 className={`text-white text-xs font-bold uppercase px-3 py-1.5 tracking-wider flex items-center justify-between ${esModoMultiple ? 'bg-purple-600' : 'bg-red-600'}`}>
+                  <span>
+                    {esModoMultiple ? 'Cotización: ' : 'Proforma — '}
+                    {cot.talleres?.nombre}
+                    {cot.variante && <span className="ml-2 normal-case text-[10px] opacity-90">({cot.variante})</span>}
+                  </span>
+                  <span className="text-xs font-normal">{lineas.length} líneas · {fmt(cot.total_general)}</span>
+                </h2>
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="bg-gray-50 border-b border-gray-200">
+                      <th className="text-left px-3 py-2 font-medium">Tipo</th>
+                      <th className="text-left px-3 py-2 font-medium">Descripción</th>
+                      <th className="text-right px-3 py-2 font-medium">Cant.</th>
+                      <th className="text-right px-3 py-2 font-medium">P. Unit.</th>
+                      <th className="text-right px-3 py-2 font-medium">Subtotal</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {lineas.map(l => (
+                      <tr key={l.id} className="border-b border-gray-100">
+                        <td className="px-3 py-1.5 text-gray-500 capitalize">{l.tipo?.replace('_', ' ')}</td>
+                        <td className="px-3 py-1.5">{l.descripcion}</td>
+                        <td className="px-3 py-1.5 text-right">{l.cantidad}</td>
+                        <td className="px-3 py-1.5 text-right">{fmt(l.precio_unitario)}</td>
+                        <td className="px-3 py-1.5 text-right font-medium">{fmt(l.subtotal)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr className="bg-gray-50"><td colSpan={4} className="px-3 py-1.5 text-right">Repuestos</td><td className="px-3 py-1.5 text-right">{fmt(cot.total_repuestos)}</td></tr>
+                    <tr className="bg-gray-50"><td colSpan={4} className="px-3 py-1.5 text-right">Mano de obra</td><td className="px-3 py-1.5 text-right">{fmt(cot.total_mano_obra)}</td></tr>
+                    {Number(cot.total_otros) > 0 && (
+                      <tr className="bg-gray-50"><td colSpan={4} className="px-3 py-1.5 text-right">Otros</td><td className="px-3 py-1.5 text-right">{fmt(cot.total_otros)}</td></tr>
+                    )}
+                    {Number(cot.total_descuentos) !== 0 && (
+                      <tr className="bg-gray-50"><td colSpan={4} className="px-3 py-1.5 text-right text-red-600">Descuentos</td><td className="px-3 py-1.5 text-right text-red-600">{fmt(cot.total_descuentos)}</td></tr>
+                    )}
+                    {!esModoMultiple && (
+                      <tr className="bg-red-50 border-t-2 border-red-600">
+                        <td colSpan={4} className="px-3 py-2 text-right font-bold">Costo taller (Pass paga)</td>
+                        <td className="px-3 py-2 text-right font-bold">{fmt(cot.total_general)}</td>
+                      </tr>
+                    )}
+                    {esModoMultiple && (
+                      <tr className="bg-purple-50 border-t border-purple-300">
+                        <td colSpan={4} className="px-3 py-1.5 text-right font-semibold">Total cotización</td>
+                        <td className="px-3 py-1.5 text-right font-semibold">{fmt(cot.total_general)}</td>
+                      </tr>
+                    )}
+                  </tfoot>
+                </table>
+              </section>
+            )
+          })}
+
+          {/* Gran total en modo múltiple */}
+          {esModoMultiple && (
+            <div className="border-2 border-purple-700 bg-purple-50 rounded px-4 py-3 flex items-center justify-between mb-5">
+              <span className="text-sm font-bold text-purple-900 uppercase tracking-wider">
+                Gran total (Costo Pass) — suma de {aprobadas.length} cotización(es)
+              </span>
+              <span className="text-base font-bold text-purple-900">{fmt(granTotal)}</span>
+            </div>
+          )}
+        </>
       )}
 
       {/* Financiero */}

@@ -43,8 +43,10 @@ export default function CotizacionesHistorico({ siniestro }) {
   if (loading) return null
   if (cotizaciones.length === 0) return null
 
+  const esModoMultiple = siniestro.tipo_cotizacion === 'multiple'
   const cotsConLineas = cotizaciones.filter(c => (c.cotizacion_lineas ?? []).length > 0)
-  const minTotal = cotsConLineas.length > 0
+  // En modo múltiple no aplica la "más económica" — no hay competencia
+  const minTotal = !esModoMultiple && cotsConLineas.length > 0
     ? Math.min(...cotsConLineas.map(c => Number(c.total_general) || 0))
     : null
 
@@ -67,8 +69,10 @@ export default function CotizacionesHistorico({ siniestro }) {
       {open && (
         <div className="px-5 pb-5 space-y-4 border-t border-gray-100 pt-4">
           <p className="text-xs text-gray-500">
-            Vista de solo lectura · <span className="text-green-700 font-medium">✓ Aprobada</span> es la elegida ·
-            <span className="ml-1">★ es la más económica</span>
+            Vista de solo lectura · <span className="text-green-700 font-medium">✓ Aprobada</span>
+            {esModoMultiple
+              ? <span className="ml-1">cada una suma al costo Pass (modo Múltiple)</span>
+              : <span> es la elegida · <span className="ml-1">★ es la más económica</span></span>}
           </p>
 
           {/* Tarjetas readonly por cotización */}
@@ -172,8 +176,8 @@ export default function CotizacionesHistorico({ siniestro }) {
             )
           })}
 
-          {/* Comparador lado a lado */}
-          {cotsConLineas.length >= 2 && (
+          {/* Comparador lado a lado — solo modo única */}
+          {!esModoMultiple && cotsConLineas.length >= 2 && (
             <div className="border border-blue-100 rounded-xl overflow-hidden mt-4">
               <div className="bg-blue-50 px-4 py-3">
                 <h4 className="text-sm font-semibold text-blue-800">Comparador</h4>
