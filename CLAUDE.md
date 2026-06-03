@@ -8,6 +8,13 @@
   - Cierre: [plans/Plan_Cierre_Implementacion_Fase2.md](plans/Plan_Cierre_Implementacion_Fase2.md)
   - Plan general: [plans/Plan_General_Fase2.md](plans/Plan_General_Fase2.md)
   - 11 subplanes ejecutados (A–K)
+- **Mejoras post-Fase 2**: ✅ En producción (iteraciones operacionales)
+  - [Plan_Mejoras_Seccion_Cotizaciones.md](plans/Plan_Mejoras_Seccion_Cotizaciones.md) — histórico colapsable + paleta pastel + tipografía Poppins
+  - [Plan_Reporte_Diario_Bitacora.md](plans/Plan_Reporte_Diario_Bitacora.md) — Reporte Diario en Dashboard + Bitácora append-only
+  - [Plan_F2_B_Datos_Cliente-NoData.md](plans/Plan_F2_B_Datos_Cliente-NoData.md) — Contrato vs Reservación + fallback a contactos hijos del partner empresa
+  - [Plan_PreDiagnostico_Diagnostico.md](plans/Plan_PreDiagnostico_Diagnostico.md) — Ubicación + Estado checking + Disponible para renta (sync Odoo)
+  - [Plan_Reporte_Diario_Excel_Printing.md](plans/Plan_Reporte_Diario_Excel_Printing.md) — Exportar Excel con logo + filtro Año/Mes + impresión mejorada
+  - [Plan_desarrollo_cotizacion_multiple.md](plans/Plan_desarrollo_cotizacion_multiple.md) + [Implementacion_cotizacion_multiple.md](plans/Implementacion_cotizacion_multiple.md) — Modo Cotización Múltiple
 - **Fase 3**: No planificada actualmente
 
 ## Proyecto
@@ -909,3 +916,115 @@ Ambas fichas (daño y servicio) ahora incluyen:
 - Checklist de documentos
 - Descuentos en breakdown de proforma
 - Variante en encabezado de proforma
+
+---
+
+## Mejoras post-Fase 2 (iteraciones operacionales)
+
+Después de Fase 2 se ejecutaron 6 paquetes de mejoras impulsadas por uso real en producción. Todas viven en `plans/` y todas están desplegadas. Ninguna abrió una "Fase 3".
+
+### 1. Mejoras a la sección de cotizaciones
+Plan: [Plan_Mejoras_Seccion_Cotizaciones.md](plans/Plan_Mejoras_Seccion_Cotizaciones.md)
+- **CotizacionesHistorico**: nueva sección colapsable readonly debajo de la Proforma con todas las cotizaciones del expediente (aprobada + rechazadas), comparador, ★ sobre la más económica, ✓ sobre la aprobada
+- **Paleta pastel**: 8 colores rotativos para identificar cada cotización visualmente (rosa, azul, verde, amarillo, lavanda, durazno, menta, lila)
+- **Tipografía Poppins** global con escala +2px (originalmente 18px; iterado después a 17px y finalmente 15px)
+
+### 2. Reporte Diario + Bitácora de actualización
+Plan: [Plan_Reporte_Diario_Bitacora.md](plans/Plan_Reporte_Diario_Bitacora.md)
+- **Reporte Diario** en el Dashboard con tabla de vehículos no disponibles para renta (filtros Servicios/Daños/Año/Mes/Ver Todos)
+- **Bitácora de actualización** (`bitacora_actualizaciones`): tabla append-only por daño o servicio, RLS (solo `puedeEditar` puede insertar), trigger de auditoría. La última nota alimenta la columna OBSERVACIONES del Reporte Diario
+- Embebida en `SiniestroDetalle` y `ServicioDetalle` antes del historial de estados
+
+### 3. Datos de cliente y contrato vs reservación
+Plan: [Plan_F2_B_Datos_Cliente-NoData.md](plans/Plan_F2_B_Datos_Cliente-NoData.md)
+- Columnas nuevas en `siniestros`: `reservacion_numero TEXT`, `cliente_direccion TEXT`
+- `contrato_numero` ahora viene de `sale.order.x_studio_no_contrato` (no de `sale.order.name`)
+- `sale.order.name` se guarda como `reservacion_numero` (ej. RSV-00403)
+- Backend: `getClienteFromPartner` ampliado para leer `street`, `is_company`, `child_ids`. Si el partner es empresa y faltan teléfono/email, cae al primer contacto persona hijo
+- Migración: los daños viejos movieron su `contrato_numero` (que era RSV) a `reservacion_numero`
+
+### 4. Pre-Diagnóstico / Checking / Disponible para renta
+Plan: [Plan_PreDiagnostico_Diagnostico.md](plans/Plan_PreDiagnostico_Diagnostico.md)
+- **Nuevos enums**:
+  - `ubicacion_vehiculo`: `pass | taller | otro`
+  - `estado_checking_dano`: `pre_diagnostico | diagnostico_cotizacion | reparacion | revision_final | entrega_proveedor | dano_completo` (display: "Daño Total" = pérdida total)
+- **Nuevas columnas en `siniestros`**: `ubicacion_vehiculo`, `ubicacion_detalle TEXT`, `estado_checking`, `disponible_renta BOOLEAN`
+- **`disponible_renta` sincroniza Odoo automáticamente**: `FALSE` → `x_studio_status_vehiculo = "En Reparación"`, `TRUE` → `"Disponible"`. Se dispara al crear el daño y al editar
+- Componente `InfoOperacional` editable (card con los 3 campos) embebida arriba de Cotizaciones
+- Wizard `SiniestroNuevo` paso 3 incluye los 3 campos con defaults razonables
+- Workflow operacional ORTOGONAL al workflow administrativo (`estado`) — coexisten
+
+### 5. Reporte Diario en Excel + Impresión mejorada
+Plan: [Plan_Reporte_Diario_Excel_Printing.md](plans/Plan_Reporte_Diario_Excel_Printing.md)
+- Reemplazado "Exportar CSV" por **"Exportar Excel"** con `exceljs` (carga dinámica, no infla bundle inicial)
+- Logo de Pass embebido (300×100px, columna A) + título dinámico + filtros + semáforo coloreado + word wrap + freeze pane
+- Título dinámico: "Registro de Daños/Servicios" según la combinación de filtros
+- Etiqueta de fecha: "Fechas: Todas" o "Fecha: Mes de Abril 2026"
+- Nombre archivo con sufijo `-danos` o `-servicios` si filtro individual
+- Filtro nuevo de **Año** (arranca en 2026, crece automáticamente cada año) + filtro de Mes con opción "Todos"
+- Headers a doble línea: "Taller / Asignado", "Fecha / Registro", "Fecha Aprox. / Ingreso", "Días en / Taller", "Motivo de / envío a taller"
+- Días en negativo (`-3` en lugar de `3`), semáforo sigue comparando contra valor absoluto
+- Print mejorado: header con logo + título + filtros + total solo visible al imprimir
+- Reporte Diario muestra vehículos desde la **creación de la ficha** (no solo cuando están físicamente en taller). Filtro: daños no cerrados/anulados con `disponible_renta = FALSE`, servicios no completados/cancelados
+
+### 6. Cotización Múltiple
+Plan: [Plan_desarrollo_cotizacion_multiple.md](plans/Plan_desarrollo_cotizacion_multiple.md)
+Implementación: [Implementacion_cotizacion_multiple.md](plans/Implementacion_cotizacion_multiple.md)
+- Nueva columna `siniestros.tipo_cotizacion TEXT DEFAULT 'unica' CHECK ('unica','multiple')`
+- Trigger `sync_costo_pass_from_approved_quote` reescrito: en modo `multiple` calcula `costo_pass = SUM(total_general)` de las aprobadas; en `unica` queda igual que antes
+- UI: selector radio "Única / Múltiple" al inicio de `CotizacionesSection`, bloqueado cuando existen cotizaciones con líneas
+- En modo Múltiple: comparador y ★ ocultos, botón "Quitar aprobación" en cada aprobada, aprobar una NO rechaza las demás
+- `ProformaSection` renderiza dual: única (igual que antes) o lista colapsable con gran total
+- `FichaSiniestroPrint` adaptada: "Proforma combinada — N cotizaciones aprobadas"
+- En `proforma_emitida` con modo múltiple, `CotizacionesSection` sigue visible (permite seguir aprobando); al hacer "Aprobar proforma" se cierra el proceso
+
+---
+
+## Resumen de cambios al modelo de datos post-Fase 2
+
+### Nuevas tablas
+- `bitacora_actualizaciones` — log append-only por daño o servicio (vínculo exclusivo siniestro_id O orden_servicio_id)
+
+### Nuevas columnas en `siniestros`
+| Columna | Tipo | Default | Origen |
+|---------|------|---------|--------|
+| `reservacion_numero` | TEXT | NULL | Plan F2_B-NoData |
+| `cliente_direccion` | TEXT | NULL | Plan F2_B-NoData |
+| `ubicacion_vehiculo` | enum | `'pass'` | Plan PreDiagnostico |
+| `ubicacion_detalle` | TEXT | NULL | Plan PreDiagnostico |
+| `estado_checking` | enum | `'pre_diagnostico'` | Plan PreDiagnostico |
+| `disponible_renta` | BOOLEAN | FALSE | Plan PreDiagnostico |
+| `tipo_cotizacion` | TEXT (CHECK) | `'unica'` | Plan cotización múltiple |
+
+### Nuevos enums
+- `ubicacion_vehiculo` — pass / taller / otro
+- `estado_checking_dano` — 6 valores del workflow operacional
+
+### Triggers reescritos
+- `sync_costo_pass_from_approved_quote` — detecta `tipo_cotizacion` y calcula `costo_pass` con SUM en modo múltiple
+
+### Migraciones SQL aplicadas
+- `db/004_bitacora_actualizaciones.sql`
+- `db/005_contrato_reservacion_direccion.sql`
+- `db/006_reset_datos_produccion.sql` (limpieza inicial de producción)
+- `db/007_predominio_checking.sql`
+- `db/008_cotizacion_multiple.sql`
+
+### Frontend — librerías nuevas
+- `exceljs` (~1MB, carga dinámica) — generación del Reporte Diario en .xlsx con logo embebido
+
+### Frontend — utilidades nuevas
+- `lib/fecha.js` — `formatDate`, `formatDateTime`, `parseLocalDate`, `diffDays` con manejo correcto de DATE puro vs TIMESTAMPTZ en UTC-6
+- `lib/colores.js` — paleta de 8 pasteles + `colorPorIndice(idx)`
+- `lib/exportarReporteExcel.js` — generador Excel con `exceljs`
+
+### Frontend — componentes nuevos
+- `BitacoraActualizaciones.jsx`
+- `ReporteDiario.jsx`
+- `InfoOperacional.jsx`
+- `CotizacionesHistorico.jsx`
+
+### Tipografía
+- Fuente principal: **Poppins** (Google Fonts)
+- Tamaño base: **15px** (`html { font-size: 15px }`) — escala global -1px sobre el default Tailwind
+- Print mode fuerza 16px para no romper las fichas A4
