@@ -553,8 +553,14 @@ export default function SiniestroDetalle() {
         {/* ── Información operacional ─────────────────────────── */}
         <InfoOperacional siniestro={siniestro} onUpdate={loadAll} />
 
-        {/* ── Cotizaciones (visible solo cuando estado=cotizando) ── */}
-        {estado === 'cotizando' && (
+        {/*
+          Cotizaciones (sección activa de gestión).
+          - Modo Única: visible solo en estado 'cotizando' (al aprobar pasa a proforma_emitida y desaparece)
+          - Modo Múltiple: también visible en 'proforma_emitida' para permitir seguir aprobando más cotizaciones
+            que se sumarán al costo Pass. Se cierra al pasar a proforma_aprobada (Aprobar proforma).
+        */}
+        {(estado === 'cotizando' ||
+          (siniestro.tipo_cotizacion === 'multiple' && estado === 'proforma_emitida')) && (
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
             <CotizacionesSection siniestro={siniestro} onUpdate={loadAll} />
           </div>
@@ -567,8 +573,14 @@ export default function SiniestroDetalle() {
           </div>
         )}
 
-        {/* ── Histórico de cotizaciones (colapsable, readonly, desde proforma_emitida) ── */}
-        {['proforma_emitida', 'proforma_aprobada', 'en_reparacion', 'reparado', 'en_cobro', 'cerrado'].includes(estado) && (
+        {/*
+          Histórico colapsable (readonly).
+          Se oculta en modo Múltiple mientras CotizacionesSection aún esté activa
+          (evita duplicar la lista). Reaparece cuando el estado avanza a
+          proforma_aprobada o más, donde ya no se pueden agregar/aprobar más.
+        */}
+        {['proforma_emitida', 'proforma_aprobada', 'en_reparacion', 'reparado', 'en_cobro', 'cerrado'].includes(estado) &&
+         !(siniestro.tipo_cotizacion === 'multiple' && estado === 'proforma_emitida') && (
           <CotizacionesHistorico siniestro={siniestro} />
         )}
 
