@@ -5,11 +5,19 @@ import { formatDate } from './fecha'
  * Genera y descarga un archivo Excel (.xlsx) del Reporte Diario.
  *
  * @param {Object} params
- * @param {Array}  params.filas          — filas ya filtradas (mismo dataset del dashboard)
- * @param {Object} params.info           — { titulo, fechaLabel, total }
- * @param {string} params.nombreArchivo  — sin extensión (se agrega .xlsx)
+ * @param {Array}  params.filas                 — filas ya filtradas (mismo dataset del dashboard)
+ * @param {Object} params.info                  — { titulo, fechaLabel, total }
+ * @param {string} params.nombreArchivo         — sin extensión (se agrega .xlsx)
+ * @param {boolean} params.mostrarMotivo        — incluir columna "Motivo de envío a taller" (default true)
+ * @param {boolean} params.mostrarObservaciones — incluir columna "Observaciones" (default true)
  */
-export async function exportarReporteExcel({ filas, info, nombreArchivo }) {
+export async function exportarReporteExcel({
+  filas,
+  info,
+  nombreArchivo,
+  mostrarMotivo = true,
+  mostrarObservaciones = true,
+}) {
   // Carga dinámica para no inflar el bundle inicial
   const ExcelJS = (await import('exceljs')).default
 
@@ -49,23 +57,28 @@ export async function exportarReporteExcel({ filas, info, nombreArchivo }) {
   ws.getRow(3).height = 22
   ws.getRow(4).height = 22
 
+  // ── Cálculo de la última columna usada (depende de los toggles) ──
+  // 13 fijas (10 + 3 financieras) + Motivo (opt) + Observaciones (opt)
+  const totalCols    = 13 + (mostrarMotivo ? 1 : 0) + (mostrarObservaciones ? 1 : 0)
+  const ultimaLetra  = String.fromCharCode(64 + totalCols)  // A=65
+
   // ── Título y meta (desde columna F para no traslaparse con el logo) ──
-  ws.mergeCells('F1:L1')
+  ws.mergeCells(`F1:${ultimaLetra}1`)
   ws.getCell('F1').value = 'PASS RENT A CAR GUATEMALA'
   ws.getCell('F1').font  = { name: 'Calibri', size: 14, bold: true, color: { argb: 'FF111827' } }
   ws.getCell('F1').alignment = { vertical: 'middle', horizontal: 'left' }
 
-  ws.mergeCells('F2:L2')
+  ws.mergeCells(`F2:${ultimaLetra}2`)
   ws.getCell('F2').value = info.titulo
   ws.getCell('F2').font  = { name: 'Calibri', size: 12, bold: true, color: { argb: 'FF111827' } }
   ws.getCell('F2').alignment = { vertical: 'middle', horizontal: 'left' }
 
-  ws.mergeCells('F3:L3')
+  ws.mergeCells(`F3:${ultimaLetra}3`)
   ws.getCell('F3').value = `${info.fechaLabel}    ·    Total registros: ${info.total}`
   ws.getCell('F3').font  = { name: 'Calibri', size: 10, color: { argb: 'FF374151' } }
   ws.getCell('F3').alignment = { vertical: 'middle', horizontal: 'left' }
 
-  ws.mergeCells('F4:L4')
+  ws.mergeCells(`F4:${ultimaLetra}4`)
   ws.getCell('F4').value = `Generado: ${new Date().toLocaleString('es-GT', {
     day: '2-digit', month: 'short', year: 'numeric',
     hour: '2-digit', minute: '2-digit',
@@ -76,21 +89,25 @@ export async function exportarReporteExcel({ filas, info, nombreArchivo }) {
   // Fila 5: separador vacío
   ws.getRow(5).height = 6
 
-  // ── Anchos de columna ─────────────────────────────────────────
-  ws.columns = [
+  // ── Anchos de columna (dinámicos según toggles) ──────────────
+  const columnsBase = [
     { width: 5  }, // A — #
     { width: 12 }, // B — Placa
     { width: 14 }, // C — Tipo veh.
     { width: 10 }, // D — Registro
     { width: 18 }, // E — Ubicación
-    { width: 18 }, // F — Taller
-    { width: 14 }, // G — F. Registro
-    { width: 14 }, // H — Est. salida
-    { width: 8  }, // I — Días
-    { width: 22 }, // J — Etapa checking
-    { width: 40 }, // K — Motivo
-    { width: 40 }, // L — Observaciones
+    { width: 18 }, // F — Taller Asignado
+    { width: 14 }, // G — Fecha Registro
+    { width: 14 }, // H — Fecha Aprox. Ingreso
+    { width: 9  }, // I — Días en Taller
+    { width: 13 }, // J — Cliente paga
+    { width: 13 }, // K — Pass paga
+    { width: 13 }, // L — Margen
+    { width: 22 }, // M — Etapa checking
   ]
+  if (mostrarMotivo)        columnsBase.push({ width: 40 })   // Motivo
+  if (mostrarObservaciones) columnsBase.push({ width: 40 })   // Observaciones
+  ws.columns = columnsBase
 
   // ── Headers (fila 7) — doble línea con \n + wrapText ────────
   const headers = [
@@ -99,10 +116,13 @@ export async function exportarReporteExcel({ filas, info, nombreArchivo }) {
     'Fecha\nRegistro',
     'Fecha Aprox.\nIngreso',
     'Días en\nTaller',
+    'Cliente\npaga',
+    'Pass\npaga',
+    'Margen',
     'Etapa checking',
-    'Motivo de\nenvío a taller',
-    'Observaciones',
   ]
+  if (mostrarMotivo)        headers.push('Motivo de\nenvío a taller')
+  if (mostrarObservaciones) headers.push('Observaciones')
   ws.getRow(7).values = headers
   ws.getRow(7).height = 32
   ws.getRow(7).eachCell(cell => {
@@ -126,26 +146,43 @@ export async function exportarReporteExcel({ filas, info, nombreArchivo }) {
   const colorRegistroFondo = (tipo) => tipo === 'dano' ? 'FFFEE2E2' : 'FFE2E8F0'
   const colorRegistroTexto = (tipo) => tipo === 'dano' ? 'FF991B1B' : 'FF334155'
 
+  // Mapeo de columnas (después de las 3 financieras):
+  // 1:#  2:Placa  3:Tipo  4:Reg  5:Ubic  6:Taller  7:F.Reg  8:F.Aprox  9:Días
+  // 10:Cliente paga  11:Pass paga  12:Margen  13:Etapa checking
+  // 14:Motivo (opt)  15:Observaciones (opt)
+  const COL_CLIENTE = 10
+  const COL_PASS    = 11
+  const COL_MARGEN  = 12
+  const COL_CHECK   = 13
+  const COL_MOTIVO  = mostrarMotivo ? 14 : null
+  const COL_OBSERV  = (mostrarMotivo ? 15 : 14)
+
   filas.forEach((f, idx) => {
     const diasPos = f.dias ?? 0
     const diasNeg = diasPos > 0 ? -diasPos : 0
-    const r = ws.addRow([
+    const esDano  = f.tipoRegistro === 'dano'
+
+    const row = [
       idx + 1,
       f.placa,
       f.tipoVehiculo || '',
-      f.tipoRegistro === 'dano' ? 'Daño' : 'Servicio',
+      esDano ? 'Daño' : 'Servicio',
       f.ubicacion || '',
       f.taller || '',
       formatDate(f.fechaRegistro)  ?? '',
       formatDate(f.fechaEstSalida) ?? '',
       diasNeg,
+      esDano ? (Number(f.montoCliente) || 0) : '—',
+      esDano ? (Number(f.costoPass)    || 0) : '—',
+      esDano ? (Number(f.margen)       || 0) : '—',
       f.checking ? (CHECKING_LABELS[f.checking] ?? f.checking) : '',
-      f.motivo || '',
-      f.observaciones || '',
-    ])
+    ]
+    if (mostrarMotivo)        row.push(f.motivo || '')
+    if (mostrarObservaciones) row.push(f.observaciones || '')
 
-    // Estilos por fila
-    r.height = undefined // auto-fit por wrap
+    const r = ws.addRow(row)
+    r.height = undefined
+
     r.eachCell((cell, colNumber) => {
       cell.font = { name: 'Calibri', size: 10, color: { argb: 'FF111827' } }
       cell.border = {
@@ -154,10 +191,11 @@ export async function exportarReporteExcel({ filas, info, nombreArchivo }) {
         bottom: { style: 'thin', color: { argb: 'FFE5E7EB' } },
         right:  { style: 'thin', color: { argb: 'FFE5E7EB' } },
       }
-      // Alineación por columna
       if (colNumber === 1 || colNumber === 9) {
         cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true }
-      } else if (colNumber === 11 || colNumber === 12) {
+      } else if (colNumber === COL_CLIENTE || colNumber === COL_PASS || colNumber === COL_MARGEN) {
+        cell.alignment = { vertical: 'middle', horizontal: 'right', wrapText: false }
+      } else if (colNumber === COL_MOTIVO || colNumber === COL_OBSERV) {
         cell.alignment = { vertical: 'top', horizontal: 'left', wrapText: true }
       } else {
         cell.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true }
@@ -183,11 +221,41 @@ export async function exportarReporteExcel({ filas, info, nombreArchivo }) {
       fgColor: { argb: colorSemaforo(f.dias ?? 0) },
     }
     cellDias.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FF111827' } }
+
+    // Formato currency en las 3 columnas financieras (solo para daños — servicios quedan como texto "—")
+    if (esDano) {
+      ;[COL_CLIENTE, COL_PASS, COL_MARGEN].forEach(c => {
+        r.getCell(c).numFmt = '"Q "#,##0.00'
+      })
+      // Color condicional en Margen: verde si ≥0, rojo si <0
+      const margenVal = Number(f.margen) || 0
+      r.getCell(COL_MARGEN).font = {
+        name: 'Calibri', size: 10, bold: true,
+        color: { argb: margenVal >= 0 ? 'FF15803D' : 'FFB91C1C' },
+      }
+      // Cliente paga: azul
+      r.getCell(COL_CLIENTE).font = {
+        name: 'Calibri', size: 10, bold: true,
+        color: { argb: 'FF1D4ED8' },
+      }
+      // Pass paga: gris oscuro
+      r.getCell(COL_PASS).font = {
+        name: 'Calibri', size: 10,
+        color: { argb: 'FF374151' },
+      }
+    } else {
+      // Servicios: las 3 columnas muestran "—" centrado en gris claro
+      ;[COL_CLIENTE, COL_PASS, COL_MARGEN].forEach(c => {
+        r.getCell(c).alignment = { vertical: 'middle', horizontal: 'center' }
+        r.getCell(c).font = { name: 'Calibri', size: 10, color: { argb: 'FFD1D5DB' } }
+      })
+    }
   })
 
   if (filas.length === 0) {
-    const r = ws.addRow(['', '', '', '', 'Sin registros para los filtros seleccionados.', '', '', '', '', '', '', ''])
-    ws.mergeCells(`A${r.number}:L${r.number}`)
+    const r = ws.addRow(Array(totalCols).fill(''))
+    r.getCell(5).value = 'Sin registros para los filtros seleccionados.'
+    ws.mergeCells(`A${r.number}:${ultimaLetra}${r.number}`)
     r.getCell(1).alignment = { vertical: 'middle', horizontal: 'center' }
     r.getCell(1).font = { italic: true, color: { argb: 'FF6B7280' } }
   }

@@ -51,6 +51,13 @@ function semaforoColor(dias) {
   return 'bg-red-500'
 }
 
+function fmtMoneda(n) {
+  if (n === null || n === undefined) return '—'
+  return `Q ${Number(n).toLocaleString('es-GT', {
+    minimumFractionDigits: 2, maximumFractionDigits: 2,
+  })}`
+}
+
 const MESES_LABEL = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
@@ -83,6 +90,8 @@ export default function ReporteDiario() {
   const [mes, setMes]                 = useState(null)  // null = Todos los meses del año
   const [incluyeServicios, setIncSv]  = useState(true)
   const [incluyeDanos, setIncDn]      = useState(true)
+  const [mostrarMotivo, setMotivo]    = useState(true)
+  const [mostrarObserv, setObserv]    = useState(true)
   const [filas, setFilas]             = useState([])
   const [loading, setLoading]         = useState(true)
 
@@ -98,6 +107,7 @@ export default function ReporteDiario() {
         id, numero, placa, tipo_vehiculo, tipo_dano, descripcion, forma_pago,
         fecha_dano, fecha_estimada_entrega, estado, estado_checking,
         ubicacion_vehiculo, ubicacion_detalle, disponible_renta, taller_id,
+        monto_cliente, costo_pass, margen,
         talleres(nombre)
       `)
       .not('estado', 'in', '("cerrado","anulado")')
@@ -179,6 +189,9 @@ export default function ReporteDiario() {
       fechaEstSalida: d.fecha_estimada_entrega,
       dias:           diasDesde(d.fecha_dano),
       checking:       d.estado_checking,
+      montoCliente:   d.monto_cliente,
+      costoPass:      d.costo_pass,
+      margen:         d.margen,
       motivo:         [
         TIPO_DANO_LABELS[d.tipo_dano] ?? d.tipo_dano,
         d.descripcion,
@@ -220,6 +233,9 @@ export default function ReporteDiario() {
     return true
   }), [filas, incluyeDanos, incluyeServicios])
 
+  // Total de columnas: 13 fijas (10 + 3 financieras) + Motivo + Observaciones
+  const nColumnas = 13 + (mostrarMotivo ? 1 : 0) + (mostrarObserv ? 1 : 0)
+
   function abrirRegistro(fila) {
     if (fila.tipoRegistro === 'dano') navigate(`/siniestros/${fila.registroId}`)
     else navigate(`/servicios/${fila.registroId}`)
@@ -256,6 +272,8 @@ export default function ReporteDiario() {
           total:      filasFiltradas.length,
         },
         nombreArchivo: nombreArchivo(),
+        mostrarMotivo,
+        mostrarObservaciones: mostrarObserv,
       })
     } catch (e) {
       console.error('[exportarExcel]', e)
@@ -342,6 +360,26 @@ export default function ReporteDiario() {
           <span className="font-medium text-gray-700">Daños</span>
         </label>
 
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={mostrarMotivo}
+            onChange={e => setMotivo(e.target.checked)}
+            className="accent-red-600"
+          />
+          <span className="font-medium text-gray-700">Mostrar Motivo</span>
+        </label>
+
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={mostrarObserv}
+            onChange={e => setObserv(e.target.checked)}
+            className="accent-red-600"
+          />
+          <span className="font-medium text-gray-700">Mostrar Observaciones</span>
+        </label>
+
         <div className="flex items-center gap-2">
           <span className="text-gray-500">Año:</span>
           <select
@@ -394,16 +432,23 @@ export default function ReporteDiario() {
               <th className="px-3 py-2 font-medium leading-tight">Fecha<br/>Registro</th>
               <th className="px-3 py-2 font-medium leading-tight">Fecha Aprox.<br/>Ingreso</th>
               <th className="px-3 py-2 font-medium text-center leading-tight">Días en<br/>Taller</th>
+              <th className="px-3 py-2 font-medium text-right leading-tight">Cliente<br/>paga</th>
+              <th className="px-3 py-2 font-medium text-right leading-tight">Pass<br/>paga</th>
+              <th className="px-3 py-2 font-medium text-right">Margen</th>
               <th className="px-3 py-2 font-medium">Etapa checking</th>
-              <th className="px-3 py-2 font-medium leading-tight">Motivo de<br/>envío a taller</th>
-              <th className="px-3 py-2 font-medium">Observaciones</th>
+              {mostrarMotivo && (
+                <th className="px-3 py-2 font-medium leading-tight">Motivo de<br/>envío a taller</th>
+              )}
+              {mostrarObserv && (
+                <th className="px-3 py-2 font-medium">Observaciones</th>
+              )}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
             {loading ? (
               Array.from({ length: 3 }).map((_, i) => (
                 <tr key={i}>
-                  {Array.from({ length: 12 }).map((_, j) => (
+                  {Array.from({ length: nColumnas }).map((_, j) => (
                     <td key={j} className="px-3 py-2">
                       <div className="h-3 bg-gray-100 rounded animate-pulse" />
                     </td>
@@ -412,7 +457,7 @@ export default function ReporteDiario() {
               ))
             ) : filasFiltradas.length === 0 ? (
               <tr>
-                <td colSpan={12} className="px-3 py-10 text-center text-gray-400 text-sm italic">
+                <td colSpan={nColumnas} className="px-3 py-10 text-center text-gray-400 text-sm italic">
                   No hay vehículos en taller en este mes con los filtros seleccionados.
                 </td>
               </tr>
@@ -445,6 +490,23 @@ export default function ReporteDiario() {
                       <span className={`inline-block w-2.5 h-2.5 rounded-full ${semaforoColor(f.dias)}`} />
                     </span>
                   </td>
+                  <td className="px-3 py-2 text-right font-medium whitespace-nowrap">
+                    {f.tipoRegistro === 'dano'
+                      ? <span className="text-blue-700">{fmtMoneda(f.montoCliente)}</span>
+                      : <span className="text-gray-300">—</span>}
+                  </td>
+                  <td className="px-3 py-2 text-right font-medium whitespace-nowrap">
+                    {f.tipoRegistro === 'dano'
+                      ? <span className="text-gray-700">{fmtMoneda(f.costoPass)}</span>
+                      : <span className="text-gray-300">—</span>}
+                  </td>
+                  <td className="px-3 py-2 text-right font-medium whitespace-nowrap">
+                    {f.tipoRegistro === 'dano'
+                      ? <span className={Number(f.margen ?? 0) >= 0 ? 'text-green-700' : 'text-red-700'}>
+                          {fmtMoneda(f.margen)}
+                        </span>
+                      : <span className="text-gray-300">—</span>}
+                  </td>
                   <td className="px-3 py-2">
                     {f.checking ? (
                       <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium border ${CHECKING_COLORS[f.checking] || ''}`}>
@@ -454,12 +516,16 @@ export default function ReporteDiario() {
                       <span className="text-gray-300 text-xs">—</span>
                     )}
                   </td>
-                  <td className="px-3 py-2 text-gray-700 max-w-[40ch] break-words align-top">
-                    {f.motivo || '—'}
-                  </td>
-                  <td className="px-3 py-2 text-gray-700 max-w-[40ch] break-words align-top">
-                    {f.observaciones}
-                  </td>
+                  {mostrarMotivo && (
+                    <td className="px-3 py-2 text-gray-700 max-w-[40ch] break-words align-top">
+                      {f.motivo || '—'}
+                    </td>
+                  )}
+                  {mostrarObserv && (
+                    <td className="px-3 py-2 text-gray-700 max-w-[40ch] break-words align-top">
+                      {f.observaciones}
+                    </td>
+                  )}
                 </tr>
               ))
             )}
