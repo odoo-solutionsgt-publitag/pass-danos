@@ -15,6 +15,7 @@
   - [Plan_PreDiagnostico_Diagnostico.md](plans/Plan_PreDiagnostico_Diagnostico.md) — Ubicación + Estado checking + Disponible para renta (sync Odoo)
   - [Plan_Reporte_Diario_Excel_Printing.md](plans/Plan_Reporte_Diario_Excel_Printing.md) — Exportar Excel con logo + filtro Año/Mes + impresión mejorada
   - [Plan_desarrollo_cotizacion_multiple.md](plans/Plan_desarrollo_cotizacion_multiple.md) + [Implementacion_cotizacion_multiple.md](plans/Implementacion_cotizacion_multiple.md) — Modo Cotización Múltiple
+  - [Plan_implementacion_tres_columnas.md](plans/Plan_implementacion_tres_columnas.md) — Reporte Diario: 3 columnas financieras (Cliente paga / Pass paga / Margen) + toggles para ocultar Motivo y Observaciones
 - **Fase 3**: No planificada actualmente
 
 ## Proyecto
@@ -977,6 +978,22 @@ Implementación: [Implementacion_cotizacion_multiple.md](plans/Implementacion_co
 - `ProformaSection` renderiza dual: única (igual que antes) o lista colapsable con gran total
 - `FichaSiniestroPrint` adaptada: "Proforma combinada — N cotizaciones aprobadas"
 - En `proforma_emitida` con modo múltiple, `CotizacionesSection` sigue visible (permite seguir aprobando); al hacer "Aprobar proforma" se cierra el proceso
+
+### 7. Reporte Diario — 3 columnas financieras + toggles de columnas
+Plan: [Plan_implementacion_tres_columnas.md](plans/Plan_implementacion_tres_columnas.md)
+- **3 columnas nuevas** ubicadas entre "Días en Taller" y "Etapa checking" (Dashboard + Excel + Print):
+  - `Cliente paga` (azul) → `siniestros.monto_cliente`
+  - `Pass paga` (gris) → `siniestros.costo_pass`
+  - `Margen` (verde si ≥0, rojo si <0) → `siniestros.margen`
+- Solo aplican a daños. Servicios muestran `—` gris claro porque `ordenes_servicio` no tiene esos campos
+- **2 toggles nuevos** en la barra de filtros (default ambos ON):
+  - `☑ Mostrar Motivo` — esconde la columna "Motivo de envío a taller"
+  - `☑ Mostrar Observaciones` — esconde la columna "Observaciones"
+- Los toggles se aplican consistentemente en Dashboard, Excel y Print (las columnas ocultas no se renderizan en el JSX, así que el print las omite automáticamente)
+- Excel: las 3 columnas financieras guardan **valores numéricos reales** con formato currency `"Q "#,##0.00` (permiten sumas, filtros, sort). Margen con color condicional verde/rojo. Cliente paga en azul, Pass paga en gris
+- Merges del header del Excel (`F1:L1` etc.) ahora se calculan dinámicamente para extenderse a la última columna usada según los toggles activos
+- `nColumnas` calculado en frontend para colSpan correcto del skeleton de loading y del estado vacío
+- Sin cambios en BD ni backend — los 3 campos ya existían en `siniestros` (`monto_cliente`, `costo_pass`, `margen` se persiste por el trigger `sync_costo_pass_from_approved_quote`)
 
 ---
 
