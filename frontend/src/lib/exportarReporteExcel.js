@@ -162,6 +162,14 @@ export async function exportarReporteExcel({
     const diasNeg = diasPos > 0 ? -diasPos : 0
     const esDano  = f.tipoRegistro === 'dano'
 
+    // Para daños: si no hay cotizaciones, costoPass y margen son null → mostrar "—"
+    const costoPassVal = esDano && f.costoPass !== null && f.costoPass !== undefined
+      ? Number(f.costoPass)
+      : (esDano ? '—' : '—')
+    const margenVal2   = esDano && f.margen !== null && f.margen !== undefined
+      ? Number(f.margen)
+      : (esDano ? '—' : '—')
+
     const row = [
       idx + 1,
       f.placa,
@@ -173,8 +181,8 @@ export async function exportarReporteExcel({
       formatDate(f.fechaEstSalida) ?? '',
       diasNeg,
       esDano ? (Number(f.montoCliente) || 0) : '—',
-      esDano ? (Number(f.costoPass)    || 0) : '—',
-      esDano ? (Number(f.margen)       || 0) : '—',
+      costoPassVal,
+      margenVal2,
       f.checking ? (CHECKING_LABELS[f.checking] ?? f.checking) : '',
     ]
     if (mostrarMotivo)        row.push(f.motivo || '')
@@ -222,26 +230,40 @@ export async function exportarReporteExcel({
     }
     cellDias.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FF111827' } }
 
-    // Formato currency en las 3 columnas financieras (solo para daños — servicios quedan como texto "—")
+    // Formato currency en las 3 columnas financieras (sólo cuando la celda
+    // contiene un número, no cuando es "—")
     if (esDano) {
-      ;[COL_CLIENTE, COL_PASS, COL_MARGEN].forEach(c => {
-        r.getCell(c).numFmt = '"Q "#,##0.00'
-      })
-      // Color condicional en Margen: verde si ≥0, rojo si <0
-      const margenVal = Number(f.margen) || 0
-      r.getCell(COL_MARGEN).font = {
-        name: 'Calibri', size: 10, bold: true,
-        color: { argb: margenVal >= 0 ? 'FF15803D' : 'FFB91C1C' },
-      }
-      // Cliente paga: azul
+      // Cliente paga: siempre numérico (default 0 si no se llenó)
+      r.getCell(COL_CLIENTE).numFmt = '"Q "#,##0.00'
       r.getCell(COL_CLIENTE).font = {
         name: 'Calibri', size: 10, bold: true,
         color: { argb: 'FF1D4ED8' },
       }
-      // Pass paga: gris oscuro
-      r.getCell(COL_PASS).font = {
-        name: 'Calibri', size: 10,
-        color: { argb: 'FF374151' },
+
+      // Pass paga: numérico si hay cotizaciones, "—" si no
+      if (typeof costoPassVal === 'number') {
+        r.getCell(COL_PASS).numFmt = '"Q "#,##0.00'
+        r.getCell(COL_PASS).font = {
+          name: 'Calibri', size: 10,
+          italic: !!f.esTemporal,        // ← italic si propuesta sin aprobar
+          color: { argb: f.esTemporal ? 'FF6B7280' : 'FF374151' },
+        }
+      } else {
+        r.getCell(COL_PASS).alignment = { vertical: 'middle', horizontal: 'center' }
+        r.getCell(COL_PASS).font = { name: 'Calibri', size: 10, color: { argb: 'FFD1D5DB' } }
+      }
+
+      // Margen: numérico si hay cotizaciones, "—" si no
+      if (typeof margenVal2 === 'number') {
+        r.getCell(COL_MARGEN).numFmt = '"Q "#,##0.00'
+        r.getCell(COL_MARGEN).font = {
+          name: 'Calibri', size: 10, bold: true,
+          italic: !!f.esTemporal,        // ← italic si propuesta sin aprobar
+          color: { argb: margenVal2 >= 0 ? 'FF15803D' : 'FFB91C1C' },
+        }
+      } else {
+        r.getCell(COL_MARGEN).alignment = { vertical: 'middle', horizontal: 'center' }
+        r.getCell(COL_MARGEN).font = { name: 'Calibri', size: 10, color: { argb: 'FFD1D5DB' } }
       }
     } else {
       // Servicios: las 3 columnas muestran "—" centrado en gris claro

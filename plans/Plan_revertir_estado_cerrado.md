@@ -49,25 +49,16 @@ Agregar un botón **"Revertir cierre"** (icono `Undo2`) visible **solo para admi
    - INSERT en `siniestro_timeline` / `orden_servicio_timeline` con `accion = "Reverso de cierre"` y el motivo en `detalle`
    - El trigger de `audit_log` registra el cambio automáticamente con `usuario_id` del admin
 
-### Cálculo del "estado anterior"
+### Mapeo fijo del estado destino (revisado)
 
-Se consulta el timeline correspondiente, buscando la fila más reciente cuyo `estado_nuevo` coincide con el estado actual cerrado. Su `estado_anterior` es el destino del reverso.
+No se consulta timeline. Mapeo directo y consistente:
 
-```sql
--- Para daños
-SELECT estado_anterior
-FROM siniestro_timeline
-WHERE siniestro_id = ?
-  AND estado_nuevo IN ('cerrado', 'anulado')
-ORDER BY created_at DESC
-LIMIT 1;
-```
+| Tipo | Estado actual | Destino del reverso |
+|------|---------------|---------------------|
+| Daño | `cerrado` o `anulado` | **`cotizando`** |
+| Servicio | `completado` o `cancelado` | **`programado`** |
 
-Si no hay registro en timeline (edge case con daños viejos pre-trigger), fallback razonable:
-- `cerrado` → `en_cobro`
-- `anulado` → `registrado`
-- `completado` (servicios) → `en_proceso`
-- `cancelado` (servicios) → `programado`
+Adicionalmente, en daños se devuelven todas las cotizaciones `aprobada` al estado `recibida` (efecto colateral del reverso). Ver detalles abajo.
 
 ---
 
@@ -75,23 +66,28 @@ Si no hay registro en timeline (edge case con daños viejos pre-trigger), fallba
 
 ### ✅ SÍ se hace
 - Botón "Revertir cierre" visible solo para `esAdmin`
-- Aplica a daños (`cerrado` y `anulado`)
-- Aplica a servicios (`completado` y `cancelado`)
-- Modal de confirmación con motivo opcional
+- Aplica a daños (`cerrado` y `anulado`) → vuelven a `cotizando`
+- Aplica a servicios (`completado` y `cancelado`) → vuelven a `programado`
+- Modal de confirmación con motivo opcional + warning sobre reportes financieros
+- En daños: **se devuelven todas las cotizaciones `aprobada` a `recibida`** y se limpia `taller_id`
+- En daños: el `costo_pass` se recalcula a `0` vía trigger SQL existente
 - Registro del reverso en el timeline correspondiente
 - Auditoría automática vía trigger global `audit_changes()`
 
 ### ❌ NO se hace en esta iteración
-- **No se borran/modifican `cobros` existentes** — quedan tal cual; si fueron creados con `es_gasto_pass = true` o `es_seguro = true`, permanecen
+- **No se borran/modifican `cobros` existentes** — quedan tal cual; si fueron creados con `es_gasto_pass = true` o `es_seguro = true`, permanecen como historial
 - **No se restauran `taller_ingresos`** — si el daño/servicio estaba reparado y se revirtió, los ingresos al taller siguen tal cual
 - **No se sincroniza Odoo** automáticamente — el `x_studio_status_vehiculo` queda donde estaba (el admin lo ajusta manualmente si aplica)
 - **No se afecta `disponible_renta`** (daños) — sigue igual; el admin decide si tocar después
-- **No se ofrece reverso múltiple** — solo un nivel (cerrado → estado anterior); para "deshacer" varias transiciones consecutivas, el admin repite el proceso
+- **No se tocan cotizaciones `rechazada`, `recibida` o `solicitada`** — sólo las que estaban `aprobada` se devuelven a `recibida`
+- **No se borran líneas de cotización** — toda la información queda preservada
+- **No se ofrece reverso múltiple** — sólo un nivel (terminal → cotizando/programado); para "deshacer" varias transiciones consecutivas, el admin repite el proceso
 
-### Razones del enfoque conservador
-- El propósito es **agregar información**, no rehacer el workflow completo
-- Tocar side effects en cascada multiplica el riesgo de inconsistencias
-- El admin tiene visibilidad para revisar y arreglar manualmente lo que sobre
+### Razones del enfoque
+- Volver a `cotizando`/`programado` es el **punto natural** para reanalizar la propuesta o agregar documentación faltante
+- Devolver aprobaciones a `recibida` permite al operador **reseleccionar la propuesta** sin tener que anular manualmente cotización por cotización
+- No tocar side effects (cobros, taller_ingresos, Odoo) mantiene la trazabilidad histórica
+- Líneas y datos de cotización **nunca se borran** — toda la información queda disponible
 
 ---
 
@@ -136,34 +132,63 @@ Mismo patrón, pero para los estados `completado` y `cancelado`.
 
 Ampliar el `ConfirmModal` existente para aceptar un campo de texto opcional, o crear un `ConfirmModalConMotivo` específico para este caso. Decisión: ampliar el existente con un prop `pedirMotivo`.
 
-### D. Handler `handleRevertirCierre`
+### D. Handler `handleRevertirCierre` para daños
 
 ```js
 async function handleRevertirCierre(motivo) {
-  // 1. Buscar estado anterior en timeline
-  const { data: tl } = await supabase
-    .from('siniestro_timeline')
-    .select('estado_anterior')
+  const estadoActual = siniestro.estado
+
+  // 1. Revertir todas las cotizaciones aprobadas a 'recibida'
+  //    (el trigger sync_costo_pass_from_approved_quote recalcula costo_pass = 0)
+  await supabase
+    .from('cotizaciones')
+    .update({ estado: 'recibida' })
     .eq('siniestro_id', siniestro.id)
-    .in('estado_nuevo', ['cerrado', 'anulado'])
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
+    .eq('estado', 'aprobada')
 
-  const estadoAnterior = tl?.estado_anterior ?? fallbackEstado(estado)
+  // 2. UPDATE del daño: estado = 'cotizando', limpiar taller_id
+  await supabase
+    .from('siniestros')
+    .update({
+      estado:    'cotizando',
+      taller_id: null,
+    })
+    .eq('id', siniestro.id)
 
-  // 2. UPDATE del estado
-  await supabase.from('siniestros').update({ estado: estadoAnterior }).eq('id', siniestro.id)
-
-  // 3. INSERT en timeline (el trigger genérico ya hace su parte; aquí agregamos
-  //    la entrada manual con el motivo)
+  // 3. INSERT en timeline con el motivo
   await supabase.from('siniestro_timeline').insert({
-    siniestro_id:   siniestro.id,
-    estado_anterior: estado,
-    estado_nuevo:    estadoAnterior,
-    accion:          'Reverso de cierre',
+    siniestro_id:    siniestro.id,
+    estado_anterior: estadoActual,
+    estado_nuevo:    'cotizando',
+    accion:          'Reverso de cierre (admin)',
     detalle:         motivo || null,
     usuario_id:      user.id,
+  })
+
+  await loadAll()
+}
+```
+
+### E. Handler `handleRevertirCierre` para servicios
+
+```js
+async function handleRevertirCierre(motivo) {
+  const estadoActual = orden.estado
+
+  // 1. UPDATE del servicio: estado = 'programado'
+  await supabase
+    .from('ordenes_servicio')
+    .update({ estado: 'programado' })
+    .eq('id', id)
+
+  // 2. INSERT en timeline con el motivo
+  await supabase.from('orden_servicio_timeline').insert({
+    orden_servicio_id: id,
+    estado_anterior:   estadoActual,
+    estado_nuevo:      'programado',
+    accion:            'Reverso de cierre (admin)',
+    detalle:           motivo || null,
+    usuario_id:        user.id,
   })
 
   await loadAll()
@@ -190,14 +215,18 @@ La validación vive en frontend (botón solo visible si `esAdmin`), pero tambié
 |---|----------|---------------|
 | 1 | Solo `admin` puede revertir | Es una acción excepcional, no operacional rutinaria |
 | 2 | Aplica a daños (`cerrado` + `anulado`) y servicios (`completado` + `cancelado`) | Comportamiento simétrico evita confusión |
-| 3 | Vuelve al **estado inmediatamente anterior** (no a uno arbitrario) | Mantiene linealidad del workflow; admin puede repetir para retroceder más |
-| 4 | NO se tocan side effects (cobros, taller_ingresos, Odoo status) | Limita el alcance del cambio; menos riesgo de inconsistencia |
-| 5 | Motivo del reverso es **opcional** pero recomendado | El admin sabe cuándo es relevante documentar |
-| 6 | Validación en frontend, sin RLS específica | Suficiente para el caso de uso; admins son confiables |
-| 7 | Sin cambios en BD ni backend | Toda la lógica vive en el frontend con queries directas a Supabase |
-| 8 | Reverso queda registrado en timeline y `audit_log` | Auditoría completa sin código extra (el trigger genérico ya lo captura) |
-| 9 | Fallback de estado si no hay timeline | Daños/servicios viejos podrían no tener timeline completo |
-| 10 | Botón ámbar/naranja (no rojo) | Acción reversible y deliberada, no destructiva — el rojo se reserva para anular/eliminar |
+| 3 | Mapeo fijo del destino: daños → `cotizando`, servicios → `programado` | Punto natural para reanalizar propuesta o agregar documentación |
+| 4 | En daños: las cotizaciones `aprobada` se devuelven a `recibida` | Permite reseleccionar propuesta sin tener que anular cotización por cotización |
+| 5 | En daños: `taller_id` se limpia a `NULL` | Coherente con el desbloqueo de aprobaciones — ya no hay taller ganador |
+| 6 | `costo_pass` se recalcula vía trigger SQL existente | Sin código adicional; el trigger `sync_costo_pass_from_approved_quote` ya maneja el caso |
+| 7 | NO se tocan side effects (cobros, taller_ingresos, Odoo status) | Limita el alcance del cambio; menos riesgo de inconsistencia |
+| 8 | Líneas y datos de cotización se preservan | Toda la información queda disponible; sólo se "des-aprueba" |
+| 9 | Motivo del reverso es **opcional** pero recomendado | El admin sabe cuándo es relevante documentar |
+| 10 | Validación en frontend, sin RLS específica | Suficiente para el caso de uso; admins son confiables |
+| 11 | Sin cambios en BD ni backend | Toda la lógica vive en el frontend con queries directas a Supabase |
+| 12 | Reverso queda registrado en timeline y `audit_log` | Auditoría completa sin código extra (el trigger genérico ya lo captura) |
+| 13 | Botón ámbar/naranja (no rojo) | Acción reversible y deliberada, no destructiva — el rojo se reserva para anular/eliminar |
+| 14 | Warning sobre reportes financieros previos | El admin sabe que tendrá que regenerar reportes para reflejar cambios de monto |
 
 ---
 
@@ -207,27 +236,44 @@ La validación vive en frontend (botón solo visible si `esAdmin`), pero tambié
 |--------|------------|
 | Admin revierte por error un cierre legítimo | Modal de confirmación + auditoría completa permite rastrear y volver a cerrar |
 | Después del reverso, el daño tiene un cobro creado que ya no aplica | El admin debe revisar y eliminar/ajustar manualmente el cobro si es necesario |
-| Si el daño estaba en `cerrado` por absorbe Pass o seguro, el `cobros.es_gasto_pass` queda como historial | Aceptable — refleja la intención original; si quiere revertir esa decisión, el admin lo edita |
-| Reverso de `anulado` en daños viejos sin timeline → fallback a `registrado` puede ser raro | Aceptable como fallback; el admin verá el resultado y puede ajustar manualmente |
-| Vehículo en Odoo quedó "Disponible" tras el cierre — al reabrir el daño, no se vuelve a "En Reparación" | El admin decide manualmente si modificar `disponible_renta` (que sí sincroniza Odoo) |
-| Usuario admin malicioso puede revertir cierres indebidamente | Auditoría completa permite detectar el patrón y revertir nuevamente |
+| Si el daño estaba en `cerrado` por Absorbe Pass o Seguro, el `cobros.es_gasto_pass` queda como historial | Aceptable — refleja la intención original; si quiere revertir esa decisión, el admin lo edita |
+| Reverso desde un estado muy avanzado (ej. `cerrado` con 3 cotizaciones aprobadas en modo múltiple) deshace todas | Es el comportamiento deseado — todas vuelven a `recibida` y el operador reaprueba las que sigan vigentes |
+| Vehículo en Odoo quedó "Disponible" tras el cierre — al reabrir el daño no se vuelve a "En Reparación" | El admin decide manualmente si modificar `disponible_renta` (que sí sincroniza Odoo) |
+| Reportes financieros mensuales / gerenciales generados antes del reverso quedan desactualizados | Warning explícito en el modal advierte sobre esto; el admin sabe que debe regenerar |
+| Servicio en estado `programado` ya no tiene los registros de `taller_ingresos` consistentes con su workflow | Los `taller_ingresos` permanecen como historial; si el servicio vuelve a `en_proceso`, se crearía un nuevo registro |
+| Usuario admin malicioso puede revertir cierres indebidamente | Auditoría completa permite detectar el patrón y volver a cerrar |
 
 ---
 
 ## Métricas de éxito
 
+### Comunes (daños y servicios)
 - [ ] Botón "Revertir cierre" visible solo para `esAdmin` en daños `cerrado`/`anulado` y servicios `completado`/`cancelado`
 - [ ] No visible para agentes (incluso agente_senior con `eliminar = true`)
 - [ ] Click muestra modal de confirmación con el estado destino correcto
-- [ ] Campo motivo opcional aparece y se guarda en `siniestro_timeline.detalle`
-- [ ] Tras confirmar, el daño regresa al estado anterior (ej. `cerrado` → `en_cobro`)
+- [ ] Campo motivo opcional aparece y se guarda en el timeline correspondiente
+- [ ] Warning ámbar sobre reportes financieros previos se muestra en el modal
 - [ ] El nuevo evento aparece en el historial de estados visual
 - [ ] El cambio queda en `audit_log` con `usuario_id` del admin
-- [ ] Los botones de transición del estado nuevo reaparecen (ej. "Cerrar expediente" disponible de nuevo)
+- [ ] Los botones de transición del estado nuevo reaparecen
 - [ ] Los `cobros` existentes siguen intactos (no se borran)
 - [ ] Los `taller_ingresos` siguen intactos
 - [ ] `disponible_renta` y Odoo status NO cambian automáticamente
-- [ ] Servicios: mismo comportamiento simétrico
+
+### Específicas para daños
+- [ ] Tras revertir, el daño regresa SIEMPRE a estado **`cotizando`** (no importa si venía de `cerrado` o `anulado`)
+- [ ] Todas las cotizaciones que estaban en `aprobada` pasan a `recibida`
+- [ ] Las cotizaciones `rechazada`, `recibida` o `solicitada` NO se tocan
+- [ ] Las líneas de cotización quedan intactas (no se borra información)
+- [ ] `siniestros.taller_id` queda en `NULL` (ya no hay taller único)
+- [ ] `siniestros.costo_pass` se recalcula a `0` automáticamente vía trigger SQL (porque no hay aprobadas)
+- [ ] `siniestros.monto_cliente` y `margen` permanecen como estaban (no se tocan)
+- [ ] La sección `CotizacionesSection` vuelve a aparecer activa para que el operador continúe el flujo
+
+### Específicas para servicios
+- [ ] Tras revertir, el servicio regresa SIEMPRE a estado **`programado`** (no importa si venía de `completado` o `cancelado`)
+- [ ] Las líneas del servicio (`orden_servicio_lineas`) quedan intactas
+- [ ] La autorización (si existía) se mantiene como información histórica
 
 ---
 
@@ -284,17 +330,36 @@ Sin restricción de fecha. Pero el modal mostrará un **Warning** sobre el impac
 ### Q4 — Ubicación del botón ✅ BARRA SUPERIOR, JUNTO A "ANULAR"
 Se ubica en la barra de acciones del top, al lado del botón "Anular", con estilo ámbar (no rojo). **Solo aparece** cuando el registro está en estado terminal (`cerrado`/`anulado` para daños, `completado`/`cancelado` para servicios) **Y** el usuario es admin.
 
-### Q5 — Estado destino del reverso ✅ MAPEO FIJO
-Sin consultar timeline. Mapeo simple y directo:
+### Q5 — Estado destino del reverso ✅ MAPEO FIJO (REVISADO)
 
-| Estado actual | Tipo | Destino del reverso |
-|--------------|------|---------------------|
-| `cerrado` | Daño | `en_cobro` |
-| `anulado` | Daño | `registrado` (fallback razonable — anulación puede venir de cualquier estado) |
-| `completado` | Servicio | `en_proceso` |
-| `cancelado` | Servicio | `programado` (fallback razonable — cancelación puede venir de cualquier estado) |
+**Decisión actualizada**: el reverso lleva el registro de vuelta a la etapa de cotización/programación. Esto significa que también se deshace la aprobación de cotizaciones (en daños) para que el operador pueda redefinir la propuesta.
 
-**Nota técnica**: el modal muestra explícitamente el estado destino antes de confirmar, así que el admin lo verifica visualmente. Si en algún caso el destino no es el adecuado (ej. daño cerrado por "Absorbe Pass" que iría a `en_cobro` aunque no haya cobro abierto), el admin puede ajustar el estado manualmente desde la BD después del reverso, o aplicar otra transición.
+| Estado actual | Tipo | Destino del reverso | Acción adicional |
+|--------------|------|---------------------|------------------|
+| `cerrado` | Daño | **`cotizando`** | Todas las cotizaciones `aprobada` se devuelven a `recibida` |
+| `anulado` | Daño | **`cotizando`** | Todas las cotizaciones `aprobada` se devuelven a `recibida` |
+| `completado` | Servicio | **`programado`** | (servicios no tienen cotizaciones — sólo cambia el estado) |
+| `cancelado` | Servicio | **`programado`** | (servicios no tienen cotizaciones — sólo cambia el estado) |
+
+**Efectos colaterales del reverso de daños**:
+- Las cotizaciones quedan con todas sus líneas intactas (no se borra información)
+- Ninguna queda como `aprobada` — el operador puede volver a aprobar/elegir
+- El trigger SQL `sync_costo_pass_from_approved_quote` recalcula `siniestros.costo_pass = 0` automáticamente (porque no hay aprobadas)
+- `siniestros.taller_id` se limpia a `NULL` (porque no hay aprobada que defina taller único)
+- `siniestros.monto_cliente` y `margen` quedan donde estaban (el admin decide si tocar)
+
+**Por qué este enfoque**:
+- El admin típicamente reabre un registro para **reanalizar la propuesta** o agregar documentación
+- Si tuviera que mantener la aprobación previa, la sección de cotizaciones quedaría parcialmente activa (raro UX)
+- Volver a `cotizando` y deshacer aprobaciones permite al operador continuar el flujo normal sin tener que "anular cotización" manualmente
+- Es la forma más limpia de "resetear el proceso de propuesta" sin perder datos
+
+**Lo que NO se toca**:
+- Las cotizaciones rechazadas siguen rechazadas (el operador las pasa a recibida manualmente si las quiere reactivar)
+- `cobros` existentes — quedan como historial
+- `taller_ingresos` — quedan como historial
+- `disponible_renta` y status Odoo — admin decide manualmente
+- Líneas de cotización — intactas
 
 ---
 

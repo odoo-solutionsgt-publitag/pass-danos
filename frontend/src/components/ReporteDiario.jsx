@@ -58,6 +58,25 @@ function fmtMoneda(n) {
   })}`
 }
 
+/**
+ * Calcula el costo Pass propuesto (basado en cotizaciones, no necesariamente aprobadas).
+ * - unica:    MIN de las cotizaciones con líneas y NO rechazadas
+ * - multiple: SUMA de las cotizaciones con líneas y NO rechazadas
+ * Retorna { monto, esTemporal } — esTemporal=true si ninguna aprobada.
+ */
+function calcularCostoPass(d) {
+  const cots = (d.cotizaciones ?? []).filter(c =>
+    c.estado !== 'rechazada' && Number(c.total_general) > 0
+  )
+  if (cots.length === 0) return { monto: null, esTemporal: false }
+  const hayAprobada = cots.some(c => c.estado === 'aprobada')
+  const tipo = d.tipo_cotizacion || 'unica'
+  const monto = tipo === 'multiple'
+    ? cots.reduce((acc, c) => acc + Number(c.total_general), 0)
+    : Math.min(...cots.map(c => Number(c.total_general)))
+  return { monto, esTemporal: !hayAprobada }
+}
+
 const MESES_LABEL = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
@@ -107,7 +126,8 @@ export default function ReporteDiario() {
         id, numero, placa, tipo_vehiculo, tipo_dano, descripcion, forma_pago,
         fecha_dano, fecha_estimada_entrega, estado, estado_checking,
         ubicacion_vehiculo, ubicacion_detalle, disponible_renta, taller_id,
-        monto_cliente, costo_pass, margen,
+        monto_cliente, costo_pass, margen, tipo_cotizacion,
+        cotizaciones(estado, total_general),
         talleres(nombre)
       `)
       .not('estado', 'in', '("cerrado","anulado")')
@@ -176,28 +196,36 @@ export default function ReporteDiario() {
     }
 
     // ── Filas de daños ──
-    const filasDanos = (danos ?? []).map(d => ({
-      id:             d.id,
-      tipoRegistro:   'dano',
-      registroId:     d.id,
-      numero:         d.numero,
-      placa:          d.placa,
-      tipoVehiculo:   d.tipo_vehiculo,
-      ubicacion:      ubicacionLabel(d.ubicacion_vehiculo, d.ubicacion_detalle),
-      taller:         d.talleres?.nombre ?? '—',
-      fechaRegistro:  d.fecha_dano,
-      fechaEstSalida: d.fecha_estimada_entrega,
-      dias:           diasDesde(d.fecha_dano),
-      checking:       d.estado_checking,
-      montoCliente:   d.monto_cliente,
-      costoPass:      d.costo_pass,
-      margen:         d.margen,
-      motivo:         [
-        TIPO_DANO_LABELS[d.tipo_dano] ?? d.tipo_dano,
-        d.descripcion,
-      ].filter(Boolean).join(' · '),
-      observaciones:  notasMap.dano[d.id] ?? FORMA_PAGO_LABELS[d.forma_pago] ?? '—',
-    }))
+    const filasDanos = (danos ?? []).map(d => {
+      // Pass paga: calculado desde cotizaciones (no necesariamente aprobadas)
+      const pass = calcularCostoPass(d)
+      const montoCliente = Number(d.monto_cliente) || 0
+      const margenCalc = pass.monto !== null ? (montoCliente - pass.monto) : null
+
+      return {
+        id:             d.id,
+        tipoRegistro:   'dano',
+        registroId:     d.id,
+        numero:         d.numero,
+        placa:          d.placa,
+        tipoVehiculo:   d.tipo_vehiculo,
+        ubicacion:      ubicacionLabel(d.ubicacion_vehiculo, d.ubicacion_detalle),
+        taller:         d.talleres?.nombre ?? '—',
+        fechaRegistro:  d.fecha_dano,
+        fechaEstSalida: d.fecha_estimada_entrega,
+        dias:           diasDesde(d.fecha_dano),
+        checking:       d.estado_checking,
+        montoCliente:   d.monto_cliente,
+        costoPass:      pass.monto,
+        margen:         margenCalc,
+        esTemporal:     pass.esTemporal,
+        motivo:         [
+          TIPO_DANO_LABELS[d.tipo_dano] ?? d.tipo_dano,
+          d.descripcion,
+        ].filter(Boolean).join(' · '),
+        observaciones:  notasMap.dano[d.id] ?? FORMA_PAGO_LABELS[d.forma_pago] ?? '—',
+      }
+    })
 
     // ── Filas de servicios ──
     const filasServicios = (servicios ?? []).map(s => ({
@@ -496,14 +524,22 @@ export default function ReporteDiario() {
                       : <span className="text-gray-300">—</span>}
                   </td>
                   <td className="px-3 py-2 text-right font-medium whitespace-nowrap">
-                    {f.tipoRegistro === 'dano'
-                      ? <span className="text-gray-700">{fmtMoneda(f.costoPass)}</span>
+                    {f.tipoRegistro === 'dano' && f.costoPass !== null
+                      ? <span
+                          className={f.esTemporal ? 'text-gray-500 italic' : 'text-gray-700'}
+                          title={f.esTemporal ? 'Monto propuesto — ninguna cotización aprobada' : 'Monto basado en cotización aprobada'}
+                        >
+                          {fmtMoneda(f.costoPass)}{f.esTemporal && '*'}
+                        </span>
                       : <span className="text-gray-300">—</span>}
                   </td>
                   <td className="px-3 py-2 text-right font-medium whitespace-nowrap">
-                    {f.tipoRegistro === 'dano'
-                      ? <span className={Number(f.margen ?? 0) >= 0 ? 'text-green-700' : 'text-red-700'}>
-                          {fmtMoneda(f.margen)}
+                    {f.tipoRegistro === 'dano' && f.margen !== null
+                      ? <span
+                          className={`${Number(f.margen) >= 0 ? 'text-green-700' : 'text-red-700'} ${f.esTemporal ? 'italic' : ''}`}
+                          title={f.esTemporal ? 'Margen propuesto — basado en cotizaciones sin aprobar' : 'Margen final'}
+                        >
+                          {fmtMoneda(f.margen)}{f.esTemporal && '*'}
                         </span>
                       : <span className="text-gray-300">—</span>}
                   </td>
@@ -532,6 +568,10 @@ export default function ReporteDiario() {
           </tbody>
         </table>
       </div>
+      <p className="px-5 py-2 text-[11px] text-gray-400 italic border-t border-gray-50 no-print">
+        * Monto propuesto basado en cotizaciones sin aprobar todavía.
+        {' '}Para daños en modo Única se muestra la cotización más económica; en modo Múltiple, la suma de todas.
+      </p>
     </div>
   )
 }

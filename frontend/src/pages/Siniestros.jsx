@@ -55,7 +55,11 @@ export default function Siniestros() {
 
   async function loadSiniestros() {
     setLoading(true)
-    let q = siniestrosQuery('id,numero,fecha_dano,placa,cliente_nombre,tipo_dano,severidad,monto_cliente,estado,estado_checking,created_at')
+    let q = siniestrosQuery(`
+      id, numero, fecha_dano, placa, cliente_nombre, tipo_dano, severidad,
+      estado, estado_checking, tipo_cotizacion, created_at,
+      cotizaciones(estado, total_general)
+    `)
       .order('created_at', { ascending: false })
       .limit(200)
 
@@ -84,6 +88,37 @@ export default function Siniestros() {
   function formatMonto(v) {
     if (!v) return '—'
     return `Q ${Number(v).toLocaleString('es-GT', { minimumFractionDigits: 2 })}`
+  }
+
+  /**
+   * Calcula el monto a mostrar para un daño según tipo_cotizacion:
+   * - 'unica':    MIN de las cotizaciones con líneas y NO rechazadas (la más económica)
+   * - 'multiple': SUM de las cotizaciones con líneas y NO rechazadas
+   *
+   * Retorna { monto, esTemporal }:
+   * - monto: número o null si no hay cotizaciones válidas
+   * - esTemporal: true si ninguna cotización está aprobada (propuesta sin aprobar)
+   */
+  function calcularMontoDano(d) {
+    const cots = (d.cotizaciones ?? []).filter(c =>
+      c.estado !== 'rechazada' && Number(c.total_general) > 0
+    )
+    if (cots.length === 0) return { monto: null, esTemporal: false }
+
+    const hayAprobada = cots.some(c => c.estado === 'aprobada')
+    const tipo = d.tipo_cotizacion || 'unica'
+
+    if (tipo === 'multiple') {
+      return {
+        monto:      cots.reduce((acc, c) => acc + Number(c.total_general), 0),
+        esTemporal: !hayAprobada,
+      }
+    }
+    // unica: la más económica
+    return {
+      monto:      Math.min(...cots.map(c => Number(c.total_general))),
+      esTemporal: !hayAprobada,
+    }
   }
 
   return (
@@ -149,7 +184,7 @@ export default function Siniestros() {
                 <th className="text-left px-5 py-3 text-xs text-gray-500 font-medium">Cliente</th>
                 <th className="text-left px-5 py-3 text-xs text-gray-500 font-medium">Tipo daño</th>
                 <th className="text-left px-5 py-3 text-xs text-gray-500 font-medium">Severidad</th>
-                <th className="text-left px-5 py-3 text-xs text-gray-500 font-medium">Total Q.</th>
+                <th className="text-left px-5 py-3 text-xs text-gray-500 font-medium">Monto</th>
                 <th className="text-left px-5 py-3 text-xs text-gray-500 font-medium">Estado</th>
                 <th className="text-left px-5 py-3 text-xs text-gray-500 font-medium">Checking</th>
                 <th className="px-5 py-3 w-12" />
@@ -189,7 +224,20 @@ export default function Siniestros() {
                         {s.severidad?.replace('_', ' ')}
                       </span>
                     </td>
-                    <td className="px-5 py-3.5 text-gray-700 whitespace-nowrap">{formatMonto(s.monto_cliente)}</td>
+                    <td className="px-5 py-3.5 whitespace-nowrap">
+                      {(() => {
+                        const { monto, esTemporal } = calcularMontoDano(s)
+                        if (monto === null) return <span className="text-gray-300">—</span>
+                        return (
+                          <span
+                            className={esTemporal ? 'text-gray-500 italic' : 'text-gray-700'}
+                            title={esTemporal ? 'Monto propuesto — ninguna cotización aprobada todavía' : 'Monto basado en cotización aprobada'}
+                          >
+                            {formatMonto(monto)}{esTemporal && '*'}
+                          </span>
+                        )
+                      })()}
+                    </td>
                     <td className="px-5 py-3.5">
                       <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${ESTADO_COLORS[s.estado]}`}>
                         {ESTADO_LABELS[s.estado] ?? s.estado}
@@ -217,6 +265,10 @@ export default function Siniestros() {
             </tbody>
           </table>
         </div>
+        <p className="px-5 py-2 text-[11px] text-gray-400 italic border-t border-gray-50">
+          * Monto propuesto basado en cotizaciones sin aprobar todavía.
+          {' '}Para daños en modo Única se muestra la más económica; en modo Múltiple, la suma de todas.
+        </p>
       </div>
     </div>
   )
