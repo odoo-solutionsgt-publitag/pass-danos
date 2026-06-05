@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, AlertTriangle, CheckCircle2, Clock, Wrench,
-  Plus, Trash2, ChevronRight, X, Printer,
+  Plus, Trash2, ChevronRight, X, Printer, Undo2,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { updateVehiculoStatus } from '../lib/odoo-api'
@@ -67,7 +67,14 @@ function semaforoColor(dias) {
 
 // ── Modal de confirmación ─────────────────────────────────────
 
-function ConfirmModal({ titulo, mensaje, confirmLabel = 'Confirmar', danger, children, onConfirm, onCancel }) {
+function ConfirmModal({
+  titulo, mensaje, confirmLabel = 'Confirmar', danger, children,
+  onConfirm, onCancel,
+  warning = null,        // Texto adicional resaltado en ámbar (opcional)
+  pedirMotivo = false,   // Si true, agrega campo de texto opcional "Motivo"
+}) {
+  const [motivo, setMotivo] = useState('')
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 p-6 space-y-4">
@@ -79,11 +86,39 @@ function ConfirmModal({ titulo, mensaje, confirmLabel = 'Confirmar', danger, chi
             {children}
           </div>
         </div>
+
+        {warning && (
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800 flex items-start gap-2">
+            <AlertTriangle size={14} className="shrink-0 mt-0.5 text-amber-600" />
+            <span>{warning}</span>
+          </div>
+        )}
+
+        {pedirMotivo && (
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">
+              Motivo del reverso <span className="text-gray-400">(opcional)</span>
+            </label>
+            <textarea
+              value={motivo}
+              onChange={e => setMotivo(e.target.value)}
+              rows={2}
+              placeholder="Describe brevemente por qué se reabre este registro..."
+              className="w-full text-sm border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-amber-400 resize-none"
+              maxLength={300}
+            />
+            <p className="text-[11px] text-gray-400 mt-0.5">{motivo.length}/300 caracteres</p>
+          </div>
+        )}
+
         <div className="flex justify-end gap-3">
           <button onClick={onCancel} className="px-4 py-2 text-sm font-medium text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">
             Cancelar
           </button>
-          <button onClick={onConfirm} className={`px-4 py-2 text-sm font-medium text-white rounded-lg ${danger ? 'bg-red-600 hover:bg-red-700' : 'bg-red-600 hover:bg-red-700'}`}>
+          <button
+            onClick={() => onConfirm(pedirMotivo ? motivo.trim() : undefined)}
+            className={`px-4 py-2 text-sm font-medium text-white rounded-lg ${danger ? 'bg-red-600 hover:bg-red-700' : 'bg-red-600 hover:bg-red-700'}`}
+          >
             {confirmLabel}
           </button>
         </div>
@@ -97,8 +132,8 @@ function ConfirmModal({ titulo, mensaje, confirmLabel = 'Confirmar', danger, chi
 export default function ServicioDetalle() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { perfil } = useAuth()
-  const { puedeCrear, puedeEditar, puedeEliminar } = usePermisos()
+  const { user, perfil } = useAuth()
+  const { puedeCrear, puedeEditar, puedeEliminar, esAdmin } = usePermisos()
 
   const [orden, setOrden]                 = useState(null)
   const [lineas, setLineas]               = useState([])
@@ -182,6 +217,40 @@ export default function ServicioDetalle() {
 
       await loadAll()
     } finally { setSaving(false) }
+  }
+
+  // ── Revertir cierre (solo admin) ──────────────────────────
+  async function handleRevertirCierre(motivo) {
+    setSaving(true)
+    setConfirm(null)
+    try {
+      // Mapeo fijo: completado → en_proceso, cancelado → programado
+      const destino = orden.estado === 'completado' ? 'en_proceso' : 'programado'
+      const estadoActual = orden.estado
+
+      // 1. UPDATE del estado
+      const { error: errUpdate } = await supabase
+        .from('ordenes_servicio')
+        .update({ estado: destino })
+        .eq('id', id)
+      if (errUpdate) throw errUpdate
+
+      // 2. INSERT manual en timeline con el motivo del reverso
+      await supabase.from('orden_servicio_timeline').insert({
+        orden_servicio_id: id,
+        estado_anterior:   estadoActual,
+        estado_nuevo:      destino,
+        accion:            'Reverso de cierre (admin)',
+        detalle:           motivo || null,
+        usuario_id:        user?.id ?? null,
+      })
+
+      await loadAll()
+    } catch (err) {
+      alert('No se pudo revertir el cierre: ' + err.message)
+    } finally {
+      setSaving(false)
+    }
   }
 
   // ── Líneas ────────────────────────────────────────────────
@@ -383,6 +452,27 @@ export default function ServicioDetalle() {
                 className="px-3 py-2 border border-red-200 text-red-600 hover:bg-red-50 text-sm rounded-lg"
               >
                 Cancelar
+              </button>
+            )}
+
+            {/* Revertir cierre — solo admin, en estados terminales */}
+            {esAdmin && ['completado', 'cancelado'].includes(estado) && (
+              <button
+                onClick={() => setConfirm({
+                  titulo: 'Revertir cierre',
+                  mensaje: `Esta orden de servicio regresará al estado "${
+                    estado === 'completado' ? 'En proceso' : 'Programado'
+                  }" para permitir nuevas modificaciones.`,
+                  confirmLabel: 'Revertir',
+                  warning: 'Este registro ya pudo haber aparecido en reportes financieros previos (mensuales, gerenciales). Al modificar montos después del reverso, esos reportes quedarán desactualizados. Genera nuevos reportes para reflejar los cambios.',
+                  pedirMotivo: true,
+                  onConfirm: handleRevertirCierre,
+                })}
+                disabled={saving}
+                className="flex items-center gap-1.5 px-3 py-2 border border-amber-300 text-amber-700 hover:bg-amber-50 text-sm rounded-lg disabled:opacity-50"
+              >
+                <Undo2 size={14} />
+                Revertir cierre
               </button>
             )}
           </div>

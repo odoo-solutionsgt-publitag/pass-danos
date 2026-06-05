@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, AlertTriangle, CheckCircle2, Clock, Wrench,
-  Car, User, FileText, X, ChevronRight, Printer, RefreshCw,
+  Car, User, FileText, X, ChevronRight, Printer, RefreshCw, Undo2,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { updateVehiculoStatus, refreshClienteSiniestro } from '../lib/odoo-api'
@@ -97,17 +97,49 @@ function formatDate(iso, opts) {
 
 // ── Modal de confirmación simple ──────────────────────────────
 
-function ConfirmModal({ titulo, mensaje, onConfirm, onCancel, confirmLabel = 'Confirmar', danger = false }) {
+function ConfirmModal({
+  titulo, mensaje, onConfirm, onCancel,
+  confirmLabel = 'Confirmar', danger = false,
+  warning = null,        // Texto adicional resaltado en ámbar (opcional)
+  pedirMotivo = false,   // Si true, agrega campo de texto opcional "Motivo"
+}) {
+  const [motivo, setMotivo] = useState('')
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 p-6 space-y-4">
         <div className="flex items-start gap-3">
           <AlertTriangle size={22} className={danger ? 'text-red-500 shrink-0 mt-0.5' : 'text-amber-500 shrink-0 mt-0.5'} />
-          <div>
+          <div className="flex-1">
             <h3 className="font-semibold text-gray-900">{titulo}</h3>
             <p className="text-sm text-gray-500 mt-1">{mensaje}</p>
           </div>
         </div>
+
+        {warning && (
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800 flex items-start gap-2">
+            <AlertTriangle size={14} className="shrink-0 mt-0.5 text-amber-600" />
+            <span>{warning}</span>
+          </div>
+        )}
+
+        {pedirMotivo && (
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">
+              Motivo del reverso <span className="text-gray-400">(opcional)</span>
+            </label>
+            <textarea
+              value={motivo}
+              onChange={e => setMotivo(e.target.value)}
+              rows={2}
+              placeholder="Describe brevemente por qué se reabre este registro..."
+              className="w-full text-sm border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-amber-400 resize-none"
+              maxLength={300}
+            />
+            <p className="text-[11px] text-gray-400 mt-0.5">{motivo.length}/300 caracteres</p>
+          </div>
+        )}
+
         <div className="flex justify-end gap-3">
           <button
             onClick={onCancel}
@@ -116,7 +148,7 @@ function ConfirmModal({ titulo, mensaje, onConfirm, onCancel, confirmLabel = 'Co
             Cancelar
           </button>
           <button
-            onClick={onConfirm}
+            onClick={() => onConfirm(pedirMotivo ? motivo.trim() : undefined)}
             className={`px-4 py-2 text-sm font-medium text-white rounded-lg ${danger ? 'bg-red-600 hover:bg-red-700' : 'bg-red-600 hover:bg-red-700'}`}
           >
             {confirmLabel}
@@ -132,8 +164,8 @@ function ConfirmModal({ titulo, mensaje, onConfirm, onCancel, confirmLabel = 'Co
 export default function SiniestroDetalle() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { perfil } = useAuth()
-  const { puedeEditar, puedeEliminar } = usePermisos()
+  const { user, perfil } = useAuth()
+  const { puedeEditar, puedeEliminar, esAdmin } = usePermisos()
 
   const [siniestro, setSiniestro] = useState(null)
   const [timeline, setTimeline] = useState([])
@@ -154,6 +186,42 @@ export default function SiniestroDetalle() {
       alert('No se pudo refrescar: ' + err.message)
     } finally {
       setRefreshingCliente(false)
+    }
+  }
+
+  // ── Revertir cierre (solo admin) ──────────────────────────
+  async function handleRevertirCierre(motivo) {
+    setSaving(true)
+    setConfirm(null)
+    try {
+      // Mapeo fijo: cerrado → en_cobro, anulado → registrado
+      const destino = siniestro.estado === 'cerrado' ? 'en_cobro' : 'registrado'
+      const estadoActual = siniestro.estado
+
+      // 1. UPDATE del estado
+      const { error: errUpdate } = await supabase
+        .from('siniestros')
+        .update({ estado: destino })
+        .eq('id', siniestro.id)
+      if (errUpdate) throw errUpdate
+
+      // 2. INSERT manual en timeline con el motivo del reverso
+      //    (el trigger automático también registra el cambio, pero acá agregamos
+      //    la acción y motivo legibles para el historial visual)
+      await supabase.from('siniestro_timeline').insert({
+        siniestro_id:     siniestro.id,
+        estado_anterior:  estadoActual,
+        estado_nuevo:     destino,
+        accion:           'Reverso de cierre (admin)',
+        detalle:          motivo || null,
+        usuario_id:       user?.id ?? null,
+      })
+
+      await loadAll()
+    } catch (err) {
+      alert('No se pudo revertir el cierre: ' + err.message)
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -264,6 +332,8 @@ export default function SiniestroDetalle() {
           mensaje={confirm.mensaje}
           confirmLabel={confirm.confirmLabel}
           danger={confirm.danger}
+          warning={confirm.warning}
+          pedirMotivo={confirm.pedirMotivo}
           onConfirm={confirm.onConfirm}
           onCancel={() => setConfirm(null)}
         />
@@ -451,6 +521,27 @@ export default function SiniestroDetalle() {
                 className="px-3 py-2 border border-red-200 text-red-600 hover:bg-red-50 text-sm rounded-lg disabled:opacity-50"
               >
                 Anular
+              </button>
+            )}
+
+            {/* Revertir cierre — solo admin, en estados terminales */}
+            {esAdmin && ['cerrado', 'anulado'].includes(estado) && (
+              <button
+                onClick={() => pedirConfirm({
+                  titulo: 'Revertir cierre',
+                  mensaje: `Este daño regresará al estado "${
+                    estado === 'cerrado' ? 'En cobro' : 'Registrado'
+                  }" para permitir nuevas modificaciones.`,
+                  confirmLabel: 'Revertir',
+                  warning: 'Este registro ya pudo haber aparecido en reportes financieros previos (mensuales, gerenciales). Al modificar montos después del reverso, esos reportes quedarán desactualizados. Genera nuevos reportes para reflejar los cambios.',
+                  pedirMotivo: true,
+                  onConfirm: handleRevertirCierre,
+                })}
+                disabled={saving}
+                className="flex items-center gap-1.5 px-3 py-2 border border-amber-300 text-amber-700 hover:bg-amber-50 text-sm rounded-lg disabled:opacity-50"
+              >
+                <Undo2 size={14} />
+                Revertir cierre
               </button>
             )}
           </div>
