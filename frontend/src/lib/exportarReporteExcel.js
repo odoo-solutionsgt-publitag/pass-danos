@@ -51,9 +51,9 @@ export async function exportarReporteExcel({
     console.warn('[exportarReporteExcel] No se pudo cargar el logo:', e.message)
   }
 
-  // Altura de filas del header (4 filas × 22pt ≈ 117 px, acomoda el logo de 100px)
-  ws.getRow(1).height = 22
-  ws.getRow(2).height = 22
+  // Altura de filas del header — espaciado mejorado para respiración visual
+  ws.getRow(1).height = 26
+  ws.getRow(2).height = 24
   ws.getRow(3).height = 22
   ws.getRow(4).height = 22
 
@@ -63,19 +63,20 @@ export async function exportarReporteExcel({
   const ultimaLetra  = String.fromCharCode(64 + totalCols)  // A=65
 
   // ── Título y meta (desde columna F para no traslaparse con el logo) ──
+  // Tipografía consistente en negro, sin colores accent. Jerarquía por tamaño y peso.
   ws.mergeCells(`F1:${ultimaLetra}1`)
   ws.getCell('F1').value = 'PASS RENT A CAR GUATEMALA'
-  ws.getCell('F1').font  = { name: 'Calibri', size: 14, bold: true, color: { argb: 'FF111827' } }
+  ws.getCell('F1').font  = { name: 'Calibri', size: 16, bold: true, color: { argb: 'FF000000' } }
   ws.getCell('F1').alignment = { vertical: 'middle', horizontal: 'left' }
 
   ws.mergeCells(`F2:${ultimaLetra}2`)
   ws.getCell('F2').value = info.titulo
-  ws.getCell('F2').font  = { name: 'Calibri', size: 12, bold: true, color: { argb: 'FF111827' } }
+  ws.getCell('F2').font  = { name: 'Calibri', size: 13, bold: true, color: { argb: 'FF000000' } }
   ws.getCell('F2').alignment = { vertical: 'middle', horizontal: 'left' }
 
   ws.mergeCells(`F3:${ultimaLetra}3`)
   ws.getCell('F3').value = `${info.fechaLabel}    ·    Total registros: ${info.total}`
-  ws.getCell('F3').font  = { name: 'Calibri', size: 10, color: { argb: 'FF374151' } }
+  ws.getCell('F3').font  = { name: 'Calibri', size: 11, color: { argb: 'FF000000' } }
   ws.getCell('F3').alignment = { vertical: 'middle', horizontal: 'left' }
 
   ws.mergeCells(`F4:${ultimaLetra}4`)
@@ -83,11 +84,17 @@ export async function exportarReporteExcel({
     day: '2-digit', month: 'short', year: 'numeric',
     hour: '2-digit', minute: '2-digit',
   })}`
-  ws.getCell('F4').font  = { name: 'Calibri', size: 9, italic: true, color: { argb: 'FF6B7280' } }
+  ws.getCell('F4').font  = { name: 'Calibri', size: 10, color: { argb: 'FF374151' } }
   ws.getCell('F4').alignment = { vertical: 'middle', horizontal: 'left' }
 
-  // Fila 5: separador vacío
-  ws.getRow(5).height = 6
+  // Fila 5: separador con borde inferior negro fino (separa visualmente
+  // el bloque del encabezado de la tabla de datos)
+  ws.getRow(5).height = 10
+  for (let col = 1; col <= totalCols; col++) {
+    ws.getRow(5).getCell(col).border = {
+      bottom: { style: 'thin', color: { argb: 'FF000000' } },
+    }
+  }
 
   // ── Anchos de columna (dinámicos según toggles) ──────────────
   const columnsBase = [
@@ -126,14 +133,14 @@ export async function exportarReporteExcel({
   ws.getRow(7).values = headers
   ws.getRow(7).height = 32
   ws.getRow(7).eachCell(cell => {
-    cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FFFFFFFF' } }
-    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE53935' } }
+    cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FF000000' } }
     cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true }
+    // Bordes negros — gruesos arriba/abajo, finos a los lados
     cell.border = {
-      top:    { style: 'thin', color: { argb: 'FF991B1B' } },
-      left:   { style: 'thin', color: { argb: 'FF991B1B' } },
-      bottom: { style: 'thin', color: { argb: 'FF991B1B' } },
-      right:  { style: 'thin', color: { argb: 'FF991B1B' } },
+      top:    { style: 'medium', color: { argb: 'FF000000' } },
+      left:   { style: 'thin',   color: { argb: 'FF000000' } },
+      bottom: { style: 'medium', color: { argb: 'FF000000' } },
+      right:  { style: 'thin',   color: { argb: 'FF000000' } },
     }
   })
 
@@ -153,7 +160,6 @@ export async function exportarReporteExcel({
   const COL_CLIENTE = 10
   const COL_PASS    = 11
   const COL_MARGEN  = 12
-  const COL_CHECK   = 13
   const COL_MOTIVO  = mostrarMotivo ? 14 : null
   const COL_OBSERV  = (mostrarMotivo ? 15 : 14)
 
@@ -194,10 +200,10 @@ export async function exportarReporteExcel({
     r.eachCell((cell, colNumber) => {
       cell.font = { name: 'Calibri', size: 10, color: { argb: 'FF111827' } }
       cell.border = {
-        top:    { style: 'thin', color: { argb: 'FFE5E7EB' } },
-        left:   { style: 'thin', color: { argb: 'FFE5E7EB' } },
-        bottom: { style: 'thin', color: { argb: 'FFE5E7EB' } },
-        right:  { style: 'thin', color: { argb: 'FFE5E7EB' } },
+        top:    { style: 'thin', color: { argb: 'FF000000' } },
+        left:   { style: 'thin', color: { argb: 'FF000000' } },
+        bottom: { style: 'thin', color: { argb: 'FF000000' } },
+        right:  { style: 'thin', color: { argb: 'FF000000' } },
       }
       if (colNumber === 1 || colNumber === 9) {
         cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true }
