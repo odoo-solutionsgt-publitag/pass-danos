@@ -111,6 +111,7 @@ export default function ReporteDiario() {
   const [incluyeDanos, setIncDn]      = useState(true)
   const [mostrarMotivo, setMotivo]    = useState(true)
   const [mostrarObserv, setObserv]    = useState(true)
+  const [mostrarChecking, setChecking] = useState(true)
   const [filas, setFilas]             = useState([])
   const [loading, setLoading]         = useState(true)
 
@@ -261,8 +262,11 @@ export default function ReporteDiario() {
     return true
   }), [filas, incluyeDanos, incluyeServicios])
 
-  // Total de columnas: 13 fijas (10 + 3 financieras) + Motivo + Observaciones
-  const nColumnas = 13 + (mostrarMotivo ? 1 : 0) + (mostrarObserv ? 1 : 0)
+  // Total de columnas: 12 fijas (9 + 3 financieras) + Etapa checking + Motivo + Observaciones
+  const nColumnas = 12
+    + (mostrarChecking ? 1 : 0)
+    + (mostrarMotivo   ? 1 : 0)
+    + (mostrarObserv   ? 1 : 0)
 
   function abrirRegistro(fila) {
     if (fila.tipoRegistro === 'dano') navigate(`/siniestros/${fila.registroId}`)
@@ -302,6 +306,7 @@ export default function ReporteDiario() {
         nombreArchivo: nombreArchivo(),
         mostrarMotivo,
         mostrarObservaciones: mostrarObserv,
+        mostrarChecking,
       })
     } catch (e) {
       console.error('[exportarExcel]', e)
@@ -408,6 +413,16 @@ export default function ReporteDiario() {
           <span className="font-medium text-gray-700">Mostrar Observaciones</span>
         </label>
 
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={mostrarChecking}
+            onChange={e => setChecking(e.target.checked)}
+            className="accent-red-600"
+          />
+          <span className="font-medium text-gray-700">Mostrar Etapa checking</span>
+        </label>
+
         <div className="flex items-center gap-2">
           <span className="text-gray-500">Año:</span>
           <select
@@ -463,7 +478,9 @@ export default function ReporteDiario() {
               <th className="px-3 py-2 font-medium text-right leading-tight">Cliente<br/>paga</th>
               <th className="px-3 py-2 font-medium text-right leading-tight">Pass<br/>paga</th>
               <th className="px-3 py-2 font-medium text-right">Margen</th>
-              <th className="px-3 py-2 font-medium">Etapa checking</th>
+              {mostrarChecking && (
+                <th className="px-3 py-2 font-medium">Etapa checking</th>
+              )}
               {mostrarMotivo && (
                 <th className="px-3 py-2 font-medium leading-tight">Motivo de<br/>envío a taller</th>
               )}
@@ -543,15 +560,17 @@ export default function ReporteDiario() {
                         </span>
                       : <span className="text-gray-300">—</span>}
                   </td>
-                  <td className="px-3 py-2">
-                    {f.checking ? (
-                      <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium border ${CHECKING_COLORS[f.checking] || ''}`}>
-                        {CHECKING_LABELS[f.checking] ?? f.checking}
-                      </span>
-                    ) : (
-                      <span className="text-gray-300 text-xs">—</span>
-                    )}
-                  </td>
+                  {mostrarChecking && (
+                    <td className="px-3 py-2">
+                      {f.checking ? (
+                        <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium border ${CHECKING_COLORS[f.checking] || ''}`}>
+                          {CHECKING_LABELS[f.checking] ?? f.checking}
+                        </span>
+                      ) : (
+                        <span className="text-gray-300 text-xs">—</span>
+                      )}
+                    </td>
+                  )}
                   {mostrarMotivo && (
                     <td className="px-3 py-2 text-gray-700 max-w-[40ch] break-words align-top">
                       {f.motivo || '—'}

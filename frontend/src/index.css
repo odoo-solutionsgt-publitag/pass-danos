@@ -43,8 +43,15 @@
     border: none !important;
   }
   body.printing-reporte-diario .reporte-diario table {
-    font-size: 10px;
+    font-size: 8px;        /* reducido ~2pt para ajustar mejor en hoja A4 */
     page-break-inside: auto;
+  }
+  body.printing-reporte-diario .reporte-diario thead th {
+    font-size: 8px;
+    padding: 4px 6px;
+  }
+  body.printing-reporte-diario .reporte-diario tbody td {
+    padding: 3px 6px;
   }
   body.printing-reporte-diario .reporte-diario tr {
     page-break-inside: avoid;

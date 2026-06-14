@@ -10,6 +10,7 @@ import { formatDate } from './fecha'
  * @param {string} params.nombreArchivo         — sin extensión (se agrega .xlsx)
  * @param {boolean} params.mostrarMotivo        — incluir columna "Motivo de envío a taller" (default true)
  * @param {boolean} params.mostrarObservaciones — incluir columna "Observaciones" (default true)
+ * @param {boolean} params.mostrarChecking      — incluir columna "Etapa checking" (default true)
  */
 export async function exportarReporteExcel({
   filas,
@@ -17,6 +18,7 @@ export async function exportarReporteExcel({
   nombreArchivo,
   mostrarMotivo = true,
   mostrarObservaciones = true,
+  mostrarChecking = true,
 }) {
   // Carga dinámica para no inflar el bundle inicial
   const ExcelJS = (await import('exceljs')).default
@@ -58,8 +60,11 @@ export async function exportarReporteExcel({
   ws.getRow(4).height = 22
 
   // ── Cálculo de la última columna usada (depende de los toggles) ──
-  // 13 fijas (10 + 3 financieras) + Motivo (opt) + Observaciones (opt)
-  const totalCols    = 13 + (mostrarMotivo ? 1 : 0) + (mostrarObservaciones ? 1 : 0)
+  // 12 fijas (9 + 3 financieras) + Etapa checking (opt) + Motivo (opt) + Observaciones (opt)
+  const totalCols    = 12
+    + (mostrarChecking      ? 1 : 0)
+    + (mostrarMotivo        ? 1 : 0)
+    + (mostrarObservaciones ? 1 : 0)
   const ultimaLetra  = String.fromCharCode(64 + totalCols)  // A=65
 
   // ── Título y meta (desde columna F para no traslaparse con el logo) ──
@@ -110,8 +115,8 @@ export async function exportarReporteExcel({
     { width: 13 }, // J — Cliente paga
     { width: 13 }, // K — Pass paga
     { width: 13 }, // L — Margen
-    { width: 22 }, // M — Etapa checking
   ]
+  if (mostrarChecking)      columnsBase.push({ width: 22 })   // Etapa checking
   if (mostrarMotivo)        columnsBase.push({ width: 40 })   // Motivo
   if (mostrarObservaciones) columnsBase.push({ width: 40 })   // Observaciones
   ws.columns = columnsBase
@@ -126,8 +131,8 @@ export async function exportarReporteExcel({
     'Cliente\npaga',
     'Pass\npaga',
     'Margen',
-    'Etapa checking',
   ]
+  if (mostrarChecking)      headers.push('Etapa checking')
   if (mostrarMotivo)        headers.push('Motivo de\nenvío a taller')
   if (mostrarObservaciones) headers.push('Observaciones')
   ws.getRow(7).values = headers
@@ -155,13 +160,15 @@ export async function exportarReporteExcel({
 
   // Mapeo de columnas (después de las 3 financieras):
   // 1:#  2:Placa  3:Tipo  4:Reg  5:Ubic  6:Taller  7:F.Reg  8:F.Aprox  9:Días
-  // 10:Cliente paga  11:Pass paga  12:Margen  13:Etapa checking
-  // 14:Motivo (opt)  15:Observaciones (opt)
+  // 10:Cliente paga  11:Pass paga  12:Margen
+  // 13+: Etapa checking (opt), Motivo (opt), Observaciones (opt) — orden dinámico
   const COL_CLIENTE = 10
   const COL_PASS    = 11
   const COL_MARGEN  = 12
-  const COL_MOTIVO  = mostrarMotivo ? 14 : null
-  const COL_OBSERV  = (mostrarMotivo ? 15 : 14)
+  let nextCol = 13
+  if (mostrarChecking) nextCol++   // ocupa col 13 pero no necesita formato especial
+  const COL_MOTIVO   = mostrarMotivo        ? nextCol++ : null
+  const COL_OBSERV   = mostrarObservaciones ? nextCol++ : null
 
   filas.forEach((f, idx) => {
     const diasPos = f.dias ?? 0
@@ -189,8 +196,8 @@ export async function exportarReporteExcel({
       esDano ? (Number(f.montoCliente) || 0) : '—',
       costoPassVal,
       margenVal2,
-      f.checking ? (CHECKING_LABELS[f.checking] ?? f.checking) : '',
     ]
+    if (mostrarChecking)      row.push(f.checking ? (CHECKING_LABELS[f.checking] ?? f.checking) : '')
     if (mostrarMotivo)        row.push(f.motivo || '')
     if (mostrarObservaciones) row.push(f.observaciones || '')
 
