@@ -443,7 +443,10 @@ Express server en puerto 3000. Proxy XML-RPC a Odoo 19.
 **product.template** (vehículos):
 - `x_studio_placa_vehiculo_id` — placa del vehículo (ej: P-091LCM)
 - `x_studio_tipo_de_vehiculo` — Sedán, SUV, Pickup, Microbús
-- `x_studio_status_vehiculo` — Selection: Disponible | Rentado | Vehículo No Asegurado | En Mantenimiento | Servicios Varios | En Reparación | Asignado al personal | No aplica
+- `x_studio_status_vehiculo` — Selection. Valores actuales (rediseño jun-2026):
+  - **Internos que la app emite**: `Disponible`, `Reparación` (daños), `Servicio` (mantenimiento)
+  - **Valores adicionales en Odoo, no emitidos por la app todavía**: `Rentado` (lo maneja Rental), `Asignado al personal`, `Servicios Varios`, `Dano Total` (label "Daño Total" — la key NO lleva eñe)
+  - **Históricos eliminados**: `En Reparación`, `En Mantenimiento`, `Vehículo No Asegurado`, `No aplica` ya no existen en Odoo
 - `x_studio_tipo_de_servicio` — tipo de servicio
 - `rent_ok` — boolean, TRUE para vehículos de alquiler
 - `categ_id` — categoría (2 = Alquiler)
@@ -950,7 +953,7 @@ Plan: [Plan_PreDiagnostico_Diagnostico.md](plans/Plan_PreDiagnostico_Diagnostico
   - `ubicacion_vehiculo`: `pass | taller | otro`
   - `estado_checking_dano`: `pre_diagnostico | diagnostico_cotizacion | reparacion | revision_final | entrega_proveedor | dano_completo` (display: "Daño Total" = pérdida total)
 - **Nuevas columnas en `siniestros`**: `ubicacion_vehiculo`, `ubicacion_detalle TEXT`, `estado_checking`, `disponible_renta BOOLEAN`
-- **`disponible_renta` sincroniza Odoo automáticamente**: `FALSE` → `x_studio_status_vehiculo = "En Reparación"`, `TRUE` → `"Disponible"`. Se dispara al crear el daño y al editar
+- **`disponible_renta` sincroniza Odoo automáticamente**: `FALSE` → `x_studio_status_vehiculo = "Reparación"`, `TRUE` → `"Disponible"`. Se dispara al crear el daño y al editar (valores renombrados en jun-2026: antes "En Reparación")
 - Componente `InfoOperacional` editable (card con los 3 campos) embebida arriba de Cotizaciones
 - Wizard `SiniestroNuevo` paso 3 incluye los 3 campos con defaults razonables
 - Workflow operacional ORTOGONAL al workflow administrativo (`estado`) — coexisten

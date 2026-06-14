@@ -63,7 +63,7 @@ export default function InfoOperacional({ siniestro, onUpdate }) {
       // Sincronizar con Odoo si cambió disponible_renta
       const cambioRenta = !!siniestro.disponible_renta !== form.disponible_renta
       if (cambioRenta && siniestro.odoo_product_id) {
-        const targetStatus = form.disponible_renta ? 'Disponible' : 'En Reparación'
+        const targetStatus = form.disponible_renta ? 'Disponible' : 'Reparación'
         try {
           await updateVehiculoStatus(siniestro.odoo_product_id, targetStatus)
         } catch (odooErr) {

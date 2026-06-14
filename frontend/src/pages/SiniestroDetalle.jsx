@@ -258,7 +258,7 @@ export default function SiniestroDetalle() {
           es_servicio: false,
         })
         if (siniestro.odoo_product_id) {
-          await updateVehiculoStatus(siniestro.odoo_product_id, 'En Reparación').catch(console.warn)
+          await updateVehiculoStatus(siniestro.odoo_product_id, 'Reparación').catch(console.warn)
         }
       }
 
@@ -407,7 +407,7 @@ export default function SiniestroDetalle() {
               <button
                 onClick={() => pedirConfirm({
                   titulo: 'Ingresar a taller',
-                  mensaje: `El vehículo ${siniestro.placa} se marcará como "En Reparación" en Odoo y se registrará el ingreso al taller.`,
+                  mensaje: `El vehículo ${siniestro.placa} se marcará como "Reparación" en Odoo y se registrará el ingreso al taller.`,
                   confirmLabel: 'Ingresar',
                   onConfirm: () => ejecutarTransicion('en_reparacion'),
                 })}

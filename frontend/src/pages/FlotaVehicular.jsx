@@ -7,23 +7,42 @@ import { siniestrosQuery, ordenesServicioQuery } from '../lib/queries'
 import { usePermisos } from '../hooks/usePermisos'
 import { formatDate as fmtDateLib } from '../lib/fecha'
 
+// Valores actualizados del campo x_studio_status_vehiculo en Odoo.
+// Internas: 'Reparación' (antes "En Reparación"), 'Servicio' (antes
+// "En Mantenimiento") y 'Dano Total' (nuevo, label "Daño Total").
+// 'Dano Total', 'Asignado al personal' y 'Servicios Varios' aún no se
+// emiten desde la app; se administran desde Odoo o se implementarán
+// más adelante.
 const STATUS_COLORS = {
   'Disponible':            { card: 'bg-green-50 border-green-200',  badge: 'bg-green-100 text-green-700 border-green-200',  dot: 'bg-green-500'  },
   'Rentado':               { card: 'bg-blue-50 border-blue-200',    badge: 'bg-blue-100 text-blue-700 border-blue-200',    dot: 'bg-blue-500'   },
-  'En Reparación':         { card: 'bg-red-50 border-red-200',      badge: 'bg-red-100 text-red-700 border-red-200',      dot: 'bg-red-500'    },
-  'En Mantenimiento':      { card: 'bg-amber-50 border-amber-200',  badge: 'bg-amber-100 text-amber-700 border-amber-200', dot: 'bg-amber-500'  },
+  'Reparación':            { card: 'bg-red-50 border-red-200',      badge: 'bg-red-100 text-red-700 border-red-200',      dot: 'bg-red-500'    },
+  'Servicio':              { card: 'bg-amber-50 border-amber-200',  badge: 'bg-amber-100 text-amber-700 border-amber-200', dot: 'bg-amber-500'  },
   'Servicios Varios':      { card: 'bg-orange-50 border-orange-200',badge: 'bg-orange-100 text-orange-700 border-orange-200',dot: 'bg-orange-500'},
-  'Vehículo No Asegurado': { card: 'bg-gray-50 border-gray-200',    badge: 'bg-gray-100 text-gray-700 border-gray-200',    dot: 'bg-gray-400'   },
   'Asignado al personal':  { card: 'bg-purple-50 border-purple-200',badge: 'bg-purple-100 text-purple-700 border-purple-200',dot: 'bg-purple-500'},
-  'No aplica':             { card: 'bg-gray-50 border-gray-200',    badge: 'bg-gray-100 text-gray-500 border-gray-200',    dot: 'bg-gray-300'   },
+  'Dano Total':            { card: 'bg-rose-50 border-rose-200',    badge: 'bg-rose-100 text-rose-700 border-rose-200',    dot: 'bg-rose-600'   },
 }
 
+// Fallback genérico (usado cuando el status viene en blanco o con un valor que no esté mapeado)
+const STATUS_FALLBACK = {
+  card: 'bg-gray-50 border-gray-200',
+  badge: 'bg-gray-100 text-gray-500 border-gray-200',
+  dot: 'bg-gray-300',
+}
+
+// Internal key (Odoo) → label visible al usuario.
+// Sólo es necesario cuando key ≠ label (ej: "Dano Total" → "Daño Total").
+const STATUS_LABELS = {
+  'Dano Total': 'Daño Total',
+}
+const statusLabel = (key) => STATUS_LABELS[key] ?? key
+
 const STATUS_ORDER = [
-  'Disponible', 'Rentado', 'En Reparación', 'En Mantenimiento',
-  'Servicios Varios', 'Vehículo No Asegurado', 'Asignado al personal', 'No aplica',
+  'Disponible', 'Rentado', 'Reparación', 'Servicio',
+  'Servicios Varios', 'Asignado al personal', 'Dano Total',
 ]
 
-const KPI_STATUSES = ['Disponible', 'Rentado', 'En Reparación', 'En Mantenimiento']
+const KPI_STATUSES = ['Disponible', 'Rentado', 'Reparación', 'Servicio']
 
 const TIPO_VEHICULO_ORDER = ['Económico', 'Sedán', 'Pickup', 'SUV/Camioneta', 'Microbus', 'Camión', 'Cotización', 'N/A']
 
@@ -121,7 +140,7 @@ export default function FlotaVehicular() {
             <div key={s} className={`rounded-xl border p-4 ${colors.card}`}>
               <div className="flex items-center gap-2">
                 <span className={`w-2 h-2 rounded-full ${colors.dot}`} />
-                <p className="text-xs text-gray-600 font-medium">{s}</p>
+                <p className="text-xs text-gray-600 font-medium">{statusLabel(s)}</p>
               </div>
               <p className="text-2xl font-bold text-gray-900 mt-1">{contadores[s] ?? 0}</p>
             </div>
@@ -195,13 +214,14 @@ export default function FlotaVehicular() {
       ) : (
         <div className="space-y-6">
           {Object.entries(porGrupo).map(([key, grupo]) => {
-            const colors = coloresGrupos[key] ?? STATUS_COLORS['No aplica']
+            const colors = coloresGrupos[key] ?? STATUS_FALLBACK
+            const label  = vistaPor === 'tipo' ? key : statusLabel(key)
             return (
               <div key={key}>
                 <h2 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
                   <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs border ${colors.badge}`}>
                     <span className={`w-1.5 h-1.5 rounded-full ${colors.dot}`} />
-                    {key}
+                    {label}
                   </span>
                   <span className="text-gray-400 font-normal">
                     {grupo.length} vehículo{grupo.length !== 1 ? 's' : ''}
@@ -219,7 +239,7 @@ export default function FlotaVehicular() {
                         <p className="font-bold text-gray-900 text-sm">{v.placa || '—'}</p>
                       </div>
                       <p className="text-gray-500 text-xs truncate mt-1">
-                        {vistaPor === 'tipo' ? (v.status || 'Sin estado') : (v.tipo_vehiculo || 'Vehículo')}
+                        {vistaPor === 'tipo' ? (statusLabel(v.status) || 'Sin estado') : (v.tipo_vehiculo || 'Vehículo')}
                       </p>
                     </button>
                   ))}
@@ -286,7 +306,7 @@ function VehiculoDrawer({ vehiculo, onClose }) {
     return () => { cancel = true }
   }, [vehiculo?.placa])
 
-  const colors = STATUS_COLORS[vehiculo.status] ?? STATUS_COLORS['No aplica']
+  const colors = STATUS_COLORS[vehiculo.status] ?? STATUS_FALLBACK
   const contrato = detalle?.contrato
 
   function formatDate(iso) {
@@ -326,7 +346,7 @@ function VehiculoDrawer({ vehiculo, onClose }) {
           <div>
             <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs border ${colors.badge}`}>
               <span className={`w-1.5 h-1.5 rounded-full ${colors.dot}`} />
-              {vehiculo.status || 'Sin estado'}
+              {statusLabel(vehiculo.status) || 'Sin estado'}
             </span>
           </div>
 

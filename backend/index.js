@@ -810,10 +810,19 @@ app.patch('/vehiculo/:id/status', async (req, res) => {
     const productId = parseInt(req.params.id);
     const { status } = req.body;
 
+    // Valores actualizados del campo x_studio_status_vehiculo en Odoo.
+    // La app actualmente escribe: 'Disponible', 'Reparación', 'Servicio'.
+    // 'Dano Total', 'Asignado al personal', 'Servicios Varios' existen
+    // pero la app no los emite todavía (se manejan desde Odoo / ficha
+    // vehículo o se implementarán más adelante).
     const VALID_STATUS = [
-      'Disponible', 'Rentado', 'Vehículo No Asegurado',
-      'En Mantenimiento', 'Servicios Varios', 'En Reparación',
-      'Asignado al personal', 'No aplica',
+      'Disponible',
+      'Rentado',
+      'Servicio',              // antes "En Mantenimiento"
+      'Reparación',            // antes "En Reparación"
+      'Asignado al personal',
+      'Servicios Varios',
+      'Dano Total',            // nuevo (label "Daño Total", key sin eñe)
     ];
 
     if (!status || !VALID_STATUS.includes(status)) {

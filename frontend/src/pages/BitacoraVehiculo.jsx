@@ -37,13 +37,24 @@ const ESTADO_SRV_COLORS = {
   cancelado:  'bg-red-100 text-red-500',
 }
 
+// Valores actualizados del campo x_studio_status_vehiculo en Odoo.
+// 'Dano Total', 'Asignado al personal' y 'Servicios Varios' aún no se emiten
+// desde la app; se administran desde Odoo o se implementarán más adelante.
 const STATUS_COLORS = {
-  'Disponible':       'bg-green-100 text-green-700 border-green-200',
-  'Rentado':          'bg-blue-100 text-blue-700 border-blue-200',
-  'En Reparación':    'bg-red-100 text-red-700 border-red-200',
-  'En Mantenimiento': 'bg-amber-100 text-amber-700 border-amber-200',
-  'Servicios Varios': 'bg-orange-100 text-orange-700 border-orange-200',
+  'Disponible':           'bg-green-100 text-green-700 border-green-200',
+  'Rentado':              'bg-blue-100 text-blue-700 border-blue-200',
+  'Reparación':           'bg-red-100 text-red-700 border-red-200',
+  'Servicio':             'bg-amber-100 text-amber-700 border-amber-200',
+  'Servicios Varios':     'bg-orange-100 text-orange-700 border-orange-200',
+  'Asignado al personal': 'bg-purple-100 text-purple-700 border-purple-200',
+  'Dano Total':           'bg-rose-100 text-rose-700 border-rose-200',
 }
+
+// Internal key → label visible (sólo cuando key ≠ label).
+const STATUS_LABELS = {
+  'Dano Total': 'Daño Total',
+}
+const statusLabel = (key) => STATUS_LABELS[key] ?? key
 
 function fmt(n) {
   return `Q ${Number(n || 0).toLocaleString('es-GT', { minimumFractionDigits: 2 })}`
@@ -152,7 +163,7 @@ export default function BitacoraVehiculo() {
           <div className="flex items-center gap-2 flex-wrap">
             {v?.status && (
               <span className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold border ${STATUS_COLORS[v.status] ?? 'bg-gray-100 text-gray-600 border-gray-200'}`}>
-                {v.status}
+                {statusLabel(v.status)}
               </span>
             )}
             <button

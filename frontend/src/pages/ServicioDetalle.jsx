@@ -17,9 +17,10 @@ import { formatDate as fmtDate, formatDateTime as fmtDateTime } from '../lib/fec
 
 // ── Constantes ────────────────────────────────────────────────
 
-// Todos los servicios ponen el vehículo en "En Mantenimiento" al ingresar al taller.
-// (Plan F2/K — simplificación de status del vehículo a 3 valores)
-const STATUS_INGRESO_TALLER = 'En Mantenimiento'
+// Todos los servicios ponen el vehículo en "Servicio" al ingresar al taller.
+// (Plan F2/K — simplificación a 3 valores. El valor interno se renombró
+// de "En Mantenimiento" a "Servicio" en Odoo.)
+const STATUS_INGRESO_TALLER = 'Servicio'
 
 const TIPO_LABELS = {
   servicio_menor:      'Servicio menor',

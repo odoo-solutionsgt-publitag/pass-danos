@@ -330,7 +330,7 @@ export default function SiniestroNuevo() {
 
       // Sincronizar status del vehículo en Odoo según disponible_renta (best-effort)
       if (form.odoo_product_id) {
-        const targetStatus = form.disponible_renta ? 'Disponible' : 'En Reparación'
+        const targetStatus = form.disponible_renta ? 'Disponible' : 'Reparación'
         updateVehiculoStatus(form.odoo_product_id, targetStatus)
           .catch(e => console.warn('[updateVehiculoStatus]', e.message))
       }
@@ -745,7 +745,7 @@ export default function SiniestroNuevo() {
                   <p className="text-xs text-gray-400 mt-1">
                     {form.disponible_renta
                       ? 'Odoo se marcará como "Disponible"'
-                      : 'Odoo se marcará como "En Reparación"'}
+                      : 'Odoo se marcará como "Reparación"'}
                   </p>
                 </div>
               </div>
