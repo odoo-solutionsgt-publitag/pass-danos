@@ -18,11 +18,11 @@ export async function fetchVehiculo(placa) {
   return apiFetch(`/vehiculo/${encodeURIComponent(placa)}`)
 }
 
-export async function updateVehiculoStatus(odooId, status) {
+export async function updateVehiculoStatus(odooId, status, userName = '') {
   return apiFetch(`/vehiculo/${odooId}/status`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ status }),
+    body: JSON.stringify({ status, userName }),
   })
 }
 

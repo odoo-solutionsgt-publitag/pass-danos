@@ -801,14 +801,55 @@ app.get('/contratos/:id', async (req, res) => {
 });
 
 // ============================================================
+// syncQtyAvailable — Ajusta stock.quant para reflejar disponibilidad
+// targetQty: 1 = disponible para renta, 0 = no disponible
+// ============================================================
+
+async function syncQtyAvailable(uid, templateId, targetQty) {
+  // 1. Obtener la variante (product.product) del product.template
+  const tmpls = await odooExecute(uid, 'product.template', 'read', [[templateId]], {
+    fields: ['product_variant_ids'],
+  });
+  const variantId = tmpls[0]?.product_variant_ids?.[0];
+  if (!variantId) throw new Error(`No se encontró variante para template ${templateId}`);
+
+  // 2. Buscar stock.quant existente en ubicación interna
+  const quants = await odooExecute(uid, 'stock.quant', 'search_read', [
+    [['product_id', '=', variantId], ['location_id.usage', '=', 'internal']],
+  ], { fields: ['id', 'quantity', 'location_id'], limit: 5 });
+
+  if (quants.length > 0) {
+    await odooExecute(uid, 'stock.quant', 'write', [
+      [quants[0].id], { inventory_quantity: targetQty },
+    ]);
+    await odooExecute(uid, 'stock.quant', 'action_apply_inventory', [[quants[0].id]]);
+  } else {
+    // No existe quant — buscar ubicación interna principal y crear uno
+    const locs = await odooExecute(uid, 'stock.location', 'search_read', [
+      [['usage', '=', 'internal'], ['active', '=', true]],
+    ], { fields: ['id', 'complete_name'], limit: 10 });
+    const loc = locs.find(l => /stock/i.test(l.complete_name)) || locs[0];
+    if (!loc) throw new Error('No se encontró ubicación interna en Odoo');
+    const quantId = await odooExecute(uid, 'stock.quant', 'create', [{
+      product_id: variantId,
+      location_id: loc.id,
+      inventory_quantity: targetQty,
+    }]);
+    await odooExecute(uid, 'stock.quant', 'action_apply_inventory', [[quantId]]);
+  }
+}
+
+// ============================================================
 // PATCH /vehiculo/:id/status — Cambiar x_studio_status_vehiculo
+//   + qty_available en stock.quant
+//   + nota en chatter del producto
 // ============================================================
 
 app.patch('/vehiculo/:id/status', async (req, res) => {
   try {
     const uid = await getUid();
     const productId = parseInt(req.params.id);
-    const { status } = req.body;
+    const { status, userName } = req.body;
 
     // Valores actualizados del campo x_studio_status_vehiculo en Odoo.
     // La app actualmente escribe: 'Disponible', 'Reparación', 'Servicio'.
@@ -829,14 +870,35 @@ app.patch('/vehiculo/:id/status', async (req, res) => {
       return res.status(400).json({ error: `Status inválido. Valores permitidos: ${VALID_STATUS.join(', ')}` });
     }
 
+    // 1. Actualizar x_studio_status_vehiculo
     const result = await odooExecute(uid, 'product.template', 'write', [
       [productId], { x_studio_status_vehiculo: status },
     ]);
-
     if (!result) return res.status(500).json({ error: 'Odoo no confirmó la escritura' });
 
-    console.log(`[PATCH /vehiculo/${productId}/status] → ${status}`);
-    res.json({ success: true, odoo_id: productId, status, updated_at: new Date().toISOString() });
+    // 2. Sincronizar qty_available vía stock.quant (best-effort)
+    const targetQty = status === 'Disponible' ? 1 : 0;
+    try {
+      await syncQtyAvailable(uid, productId, targetQty);
+    } catch (qtyErr) {
+      console.warn(`[PATCH /vehiculo/${productId}/status] qty sync falló:`, qtyErr.message);
+    }
+
+    // 3. Registrar en el chatter del producto (best-effort)
+    try {
+      const actor = userName || 'Sistema de Gestión de Daños';
+      const body = `<p>Estado del vehículo actualizado a <strong>${status}</strong> — qty disponible: <strong>${targetQty}</strong><br/>Registrado por: <strong>${actor}</strong> desde la app de Gestión de Daños/Mantenimiento.</p>`;
+      await odooExecute(uid, 'product.template', 'message_post', [[productId]], {
+        body,
+        message_type: 'comment',
+        subtype_xmlid: 'mail.mt_note',
+      });
+    } catch (chatErr) {
+      console.warn(`[PATCH /vehiculo/${productId}/status] chatter falló:`, chatErr.message);
+    }
+
+    console.log(`[PATCH /vehiculo/${productId}/status] → ${status} (qty=${targetQty}) por ${userName || 'sistema'}`);
+    res.json({ success: true, odoo_id: productId, status, qty: targetQty, updated_at: new Date().toISOString() });
   } catch (err) {
     console.error('[PATCH /vehiculo/:id/status]', err.message);
     res.status(500).json({ error: err.message });

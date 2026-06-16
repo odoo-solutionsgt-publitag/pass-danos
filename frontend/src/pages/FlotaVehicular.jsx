@@ -44,16 +44,14 @@ const STATUS_ORDER = [
 
 const KPI_STATUSES = ['Disponible', 'Rentado', 'Reparación', 'Servicio']
 
-const TIPO_VEHICULO_ORDER = ['Económico', 'Sedán', 'Pickup', 'SUV/Camioneta', 'Microbus', 'Camión', 'Cotización', 'N/A']
+const TIPO_VEHICULO_ORDER = ['Sedán', 'Pickup', 'SUV/Camioneta', 'Microbus', 'Camión', 'N/A']
 
 const TIPO_VEHICULO_COLORS = {
-  'Económico':     { badge: 'bg-emerald-100 text-emerald-700 border-emerald-200', dot: 'bg-emerald-500' },
   'Sedán':         { badge: 'bg-sky-100 text-sky-700 border-sky-200',             dot: 'bg-sky-500'     },
   'Pickup':        { badge: 'bg-orange-100 text-orange-700 border-orange-200',    dot: 'bg-orange-500'  },
   'SUV/Camioneta': { badge: 'bg-purple-100 text-purple-700 border-purple-200',    dot: 'bg-purple-500'  },
   'Microbus':      { badge: 'bg-pink-100 text-pink-700 border-pink-200',          dot: 'bg-pink-500'    },
   'Camión':        { badge: 'bg-amber-100 text-amber-700 border-amber-200',       dot: 'bg-amber-500'   },
-  'Cotización':    { badge: 'bg-indigo-100 text-indigo-700 border-indigo-200',    dot: 'bg-indigo-500'  },
   'N/A':           { badge: 'bg-gray-100 text-gray-500 border-gray-200',          dot: 'bg-gray-300'    },
 }
 

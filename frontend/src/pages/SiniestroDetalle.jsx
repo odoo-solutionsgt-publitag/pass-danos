@@ -258,7 +258,7 @@ export default function SiniestroDetalle() {
           es_servicio: false,
         })
         if (siniestro.odoo_product_id) {
-          await updateVehiculoStatus(siniestro.odoo_product_id, 'Reparación').catch(console.warn)
+          await updateVehiculoStatus(siniestro.odoo_product_id, 'Reparación', perfil?.nombre_completo).catch(console.warn)
         }
       }
 
@@ -276,7 +276,7 @@ export default function SiniestroDetalle() {
             .in('id', ingresos.map(i => i.id))
         }
         if (siniestro.odoo_product_id) {
-          await updateVehiculoStatus(siniestro.odoo_product_id, 'Disponible').catch(console.warn)
+          await updateVehiculoStatus(siniestro.odoo_product_id, 'Disponible', perfil?.nombre_completo).catch(console.warn)
         }
       }
 
@@ -513,7 +513,7 @@ export default function SiniestroDetalle() {
                   onConfirm: async () => {
                     await ejecutarTransicion('anulado')
                     if (hayTallerActivo && siniestro.odoo_product_id) {
-                      await updateVehiculoStatus(siniestro.odoo_product_id, 'Disponible').catch(console.warn)
+                      await updateVehiculoStatus(siniestro.odoo_product_id, 'Disponible', perfil?.nombre_completo).catch(console.warn)
                     }
                   },
                 })}
@@ -642,7 +642,7 @@ export default function SiniestroDetalle() {
         </div>
 
         {/* ── Información operacional ─────────────────────────── */}
-        <InfoOperacional siniestro={siniestro} onUpdate={loadAll} />
+        <InfoOperacional siniestro={siniestro} onUpdate={loadAll} userName={perfil?.nombre_completo} />
 
         {/* ── Fechas de taller ────────────────────────────────── */}
         <FechasTaller

@@ -189,7 +189,7 @@ export default function ServicioDetalle() {
           es_dano:           false,
         })
         if (orden.odoo_product_id) {
-          await updateVehiculoStatus(orden.odoo_product_id, STATUS_INGRESO_TALLER).catch(console.warn)
+          await updateVehiculoStatus(orden.odoo_product_id, STATUS_INGRESO_TALLER, perfil?.nombre_completo).catch(console.warn)
         }
       }
 
@@ -206,13 +206,13 @@ export default function ServicioDetalle() {
             .in('id', abiertos.map(t => t.id))
         }
         if (orden.odoo_product_id) {
-          await updateVehiculoStatus(orden.odoo_product_id, 'Disponible').catch(console.warn)
+          await updateVehiculoStatus(orden.odoo_product_id, 'Disponible', perfil?.nombre_completo).catch(console.warn)
         }
       }
 
       if (nuevoEstado === 'cancelado' && tallerIngresos.some(t => !t.fecha_egreso)) {
         if (orden.odoo_product_id) {
-          await updateVehiculoStatus(orden.odoo_product_id, 'Disponible').catch(console.warn)
+          await updateVehiculoStatus(orden.odoo_product_id, 'Disponible', perfil?.nombre_completo).catch(console.warn)
         }
       }
 

@@ -32,7 +32,7 @@ export const CHECKING_COLORS = Object.fromEntries(CHECKING_OPTS.map(o => [o.valu
  *  - siniestro: objeto del daño (incluye odoo_product_id, placa)
  *  - onUpdate?: callback al guardar
  */
-export default function InfoOperacional({ siniestro, onUpdate }) {
+export default function InfoOperacional({ siniestro, onUpdate, userName = '' }) {
   const { puedeEditar } = usePermisos()
   const [editando, setEditando] = useState(false)
   const [form, setForm] = useState({
@@ -65,7 +65,7 @@ export default function InfoOperacional({ siniestro, onUpdate }) {
       if (cambioRenta && siniestro.odoo_product_id) {
         const targetStatus = form.disponible_renta ? 'Disponible' : 'Reparación'
         try {
-          await updateVehiculoStatus(siniestro.odoo_product_id, targetStatus)
+          await updateVehiculoStatus(siniestro.odoo_product_id, targetStatus, userName)
         } catch (odooErr) {
           console.warn('[InfoOperacional] Odoo sync falló:', odooErr.message)
           setWarning(`Cambios guardados, pero no se pudo sincronizar Odoo: ${odooErr.message}`)

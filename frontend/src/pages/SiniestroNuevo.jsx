@@ -31,7 +31,7 @@ const STEPS = ['Vehículo', 'Cliente', 'Daño']
 
 export default function SiniestroNuevo() {
   const navigate = useNavigate()
-  const { user } = useAuth()
+  const { user, perfil } = useAuth()
   const { puedeCrear, loading: permLoading } = usePermisos()
 
   useEffect(() => {
@@ -331,7 +331,7 @@ export default function SiniestroNuevo() {
       // Sincronizar status del vehículo en Odoo según disponible_renta (best-effort)
       if (form.odoo_product_id) {
         const targetStatus = form.disponible_renta ? 'Disponible' : 'Reparación'
-        updateVehiculoStatus(form.odoo_product_id, targetStatus)
+        updateVehiculoStatus(form.odoo_product_id, targetStatus, perfil?.nombre_completo)
           .catch(e => console.warn('[updateVehiculoStatus]', e.message))
       }
 
