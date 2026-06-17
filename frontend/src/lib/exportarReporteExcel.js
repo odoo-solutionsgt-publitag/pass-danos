@@ -56,7 +56,6 @@ export async function exportarReporteExcel({
   // Altura de filas del header — espaciado mejorado para respiración visual
   ws.getRow(1).height = 26
   ws.getRow(2).height = 24
-  ws.getRow(3).height = 22
   ws.getRow(4).height = 22
 
   // ── Cálculo de la última columna usada (depende de los toggles) ──
@@ -79,18 +78,18 @@ export async function exportarReporteExcel({
   ws.getCell('F2').font  = { name: 'Calibri', size: 13, bold: true, color: { argb: 'FF000000' } }
   ws.getCell('F2').alignment = { vertical: 'middle', horizontal: 'left' }
 
-  ws.mergeCells(`F3:${ultimaLetra}3`)
-  ws.getCell('F3').value = `${info.fechaLabel}    ·    Total registros: ${info.total}`
-  ws.getCell('F3').font  = { name: 'Calibri', size: 11, color: { argb: 'FF000000' } }
-  ws.getCell('F3').alignment = { vertical: 'middle', horizontal: 'left' }
-
   ws.mergeCells(`F4:${ultimaLetra}4`)
-  ws.getCell('F4').value = `Generado: ${new Date().toLocaleString('es-GT', {
-    day: '2-digit', month: 'short', year: 'numeric',
-    hour: '2-digit', minute: '2-digit',
-  })}`
-  ws.getCell('F4').font  = { name: 'Calibri', size: 10, color: { argb: 'FF374151' } }
-  ws.getCell('F4').alignment = { vertical: 'middle', horizontal: 'left' }
+  const _nowGT   = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Guatemala' }))
+  const _dia     = _nowGT.toLocaleDateString('es-GT', { weekday: 'long' })
+  const _diaCap  = _dia.charAt(0).toUpperCase() + _dia.slice(1)
+  const _diaNum  = _nowGT.getDate()
+  const _mes     = _nowGT.toLocaleDateString('es-GT', { month: 'long' })
+  const _anio    = _nowGT.getFullYear()
+  const _hh      = String(_nowGT.getHours()).padStart(2, '0')
+  const _mm      = String(_nowGT.getMinutes()).padStart(2, '0')
+  ws.getCell('F4').value = `Reporte generado: ${_diaCap}, ${_diaNum} de ${_mes} ${_anio}, ${_hh}:${_mm} hrs.`
+  ws.getCell('F4').font  = { name: 'Calibri', size: 12, color: { argb: 'FF374151' } }
+  ws.getCell('F4').alignment = { vertical: 'middle', horizontal: 'right' }
 
   // Fila 5: separador con borde inferior negro fino (separa visualmente
   // el bloque del encabezado de la tabla de datos)

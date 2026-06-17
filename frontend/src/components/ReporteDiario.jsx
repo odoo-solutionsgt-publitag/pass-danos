@@ -335,11 +335,16 @@ export default function ReporteDiario() {
           <div className="flex-1">
             <h1 className="text-base font-bold text-gray-900">PASS RENT A CAR GUATEMALA</h1>
             <p className="text-sm font-semibold text-red-700">{tituloReporte()}</p>
-            <p className="text-xs text-gray-600 mt-0.5">
-              {fechaLabel()} · Total: {filasFiltradas.length}
-            </p>
-            <p className="text-[11px] text-gray-400 mt-0.5">
-              Generado: {new Date().toLocaleString('es-GT', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+            <p className="text-[13px] text-gray-400 mt-0.5 text-right">
+              {(() => {
+                const d = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Guatemala' }))
+                const dia = d.toLocaleDateString('es-GT', { weekday: 'long' })
+                const diaCap = dia.charAt(0).toUpperCase() + dia.slice(1)
+                const mes = d.toLocaleDateString('es-GT', { month: 'long' })
+                const hh = String(d.getHours()).padStart(2, '0')
+                const mm = String(d.getMinutes()).padStart(2, '0')
+                return `Reporte generado: ${diaCap}, ${d.getDate()} de ${mes} ${d.getFullYear()}, ${hh}:${mm} hrs.`
+              })()}
             </p>
           </div>
         </div>
