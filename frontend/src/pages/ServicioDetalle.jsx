@@ -680,7 +680,7 @@ export default function ServicioDetalle() {
               numero:          orden.numero,
               placa:           orden.placa,
               odoo_product_id: orden.odoo_product_id,
-              vehiculo_tipo:   orden.tipo_vehiculo ?? '',
+              vehiculo_tipo:   [orden.tipo_vehiculo, orden.marca, orden.linea, orden.anio].filter(Boolean).join(' '),
               vehiculo_color:  orden.vehiculo_color ?? '',
             }}
             userName={perfil?.nombre_completo}

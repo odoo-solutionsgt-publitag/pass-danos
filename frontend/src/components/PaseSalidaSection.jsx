@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Printer, ClipboardList, AlertCircle, CheckCircle2, XCircle, Loader2 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { imprimirPasePDF } from '../lib/pase-pdf'
+import { fetchVehiculo } from '../lib/odoo-api'
 import { usePermisos } from '../hooks/usePermisos'
 
 // ─── Constantes ────────────────────────────────────────────────────────────────
@@ -92,6 +93,18 @@ export default function PaseSalidaSection({
     setSaving(true); setError('')
     try {
       const { fecha, hora } = now_gt()
+
+      // Obtener color del vehículo desde Odoo (best-effort)
+      let vehiculoColor = origen.vehiculo_color || ''
+      if (!vehiculoColor && origen.placa) {
+        try {
+          const vData = await fetchVehiculo(origen.placa)
+          vehiculoColor = vData.vehiculo?.color || ''
+        } catch {
+          // Color no crítico — continuar sin él
+        }
+      }
+
       const payload = {
         ...(esDano
           ? { siniestro_id: origen.id }
@@ -99,7 +112,7 @@ export default function PaseSalidaSection({
         contrato_referencia: origen.numero,
         vehiculo_placa:      origen.placa,
         vehiculo_tipo:       origen.vehiculo_tipo  ?? '',
-        vehiculo_color:      origen.vehiculo_color ?? '',
+        vehiculo_color:      vehiculoColor,
         odoo_product_id:     origen.odoo_product_id ?? null,
         motivo_salida:       motivoPreset ?? (esDano ? 'taller_reparacion' : 'taller_servicio'),
         lugar_taller:        tallerNombre || null,

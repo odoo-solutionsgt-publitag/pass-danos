@@ -35,7 +35,8 @@ export async function imprimirPasePDF(pase) {
 
   function set(fieldName, value) {
     try {
-      form.getTextField(fieldName).setText(value ?? '')
+      const str = (value ?? '').toString().toUpperCase()
+      form.getTextField(fieldName).setText(str)
     } catch {
       // Campo no encontrado en el AcroForm — continuar sin error
     }

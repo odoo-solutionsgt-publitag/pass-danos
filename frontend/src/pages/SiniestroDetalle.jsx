@@ -665,7 +665,7 @@ export default function SiniestroDetalle() {
               numero:          siniestro.numero,
               placa:           siniestro.placa,
               odoo_product_id: siniestro.odoo_product_id,
-              vehiculo_tipo:   [siniestro.marca, siniestro.linea, siniestro.anio].filter(Boolean).join(' '),
+              vehiculo_tipo:   [siniestro.tipo_vehiculo, siniestro.marca, siniestro.linea, siniestro.anio].filter(Boolean).join(' '),
               vehiculo_color:  siniestro.vehiculo_color ?? '',
             }}
             userName={perfil?.nombre_completo}
