@@ -65,6 +65,9 @@ export default function PaseSalidaSection({
   const [showCierre, setShowCierre] = useState(false)
   const [piloto, setPiloto]         = useState('')
   const [combustible, setCombustible] = useState('Full')
+  const [km, setKm]                 = useState('')
+  // Mostrar campo Km solo en Daños cuando no viene pre-llenado del registro
+  const pedirKm = esDano && kmInicial == null
   const [cierre, setCierre]         = useState({ combustible_entrada: 'Full', kilometraje_entrada: '' })
   const [saving, setSaving]         = useState(false)
   const [error, setError]           = useState('')
@@ -118,7 +121,7 @@ export default function PaseSalidaSection({
         lugar_taller:        tallerNombre || null,
         piloto_pass:         piloto.trim(),
         combustible_salida:  combustible,
-        kilometraje_salida:  kmInicial != null ? Number(kmInicial) : null,
+        kilometraje_salida:  kmInicial != null ? Number(kmInicial) : (km ? Number(km) : null),
         fecha_salida:        fecha,
         hora_salida:         hora,
         usuario_responsable: userName || origen.registrado_por_nombre || '',
@@ -137,6 +140,7 @@ export default function PaseSalidaSection({
       setShowForm(false)
       setPiloto('')
       setCombustible('Full')
+      setKm('')
 
       // Imprimir automáticamente al crear
       await imprimirPase(data)
@@ -300,31 +304,45 @@ export default function PaseSalidaSection({
             />
           </div>
 
-          {/* Combustible */}
-          <div>
-            <label className="block text-xs text-gray-500 mb-2">Combustible al salir</label>
-            <div className="flex flex-wrap gap-1.5">
-              {COMBUSTIBLES.map(c => (
-                <button
-                  key={c}
-                  type="button"
-                  onClick={() => setCombustible(c)}
-                  className={`text-xs px-3 py-1.5 rounded-lg border font-medium ${
-                    combustible === c
-                      ? 'bg-red-50 border-red-300 text-red-700'
-                      : 'border-gray-200 text-gray-600 hover:bg-gray-50'
-                  }`}
-                >
-                  {c}
-                </button>
-              ))}
+          {/* Combustible + Km (Km solo en Daños) */}
+          <div className={`grid gap-4 ${pedirKm ? 'grid-cols-2' : 'grid-cols-1'}`}>
+            <div>
+              <label className="block text-xs text-gray-500 mb-2">Combustible al salir</label>
+              <div className="flex flex-wrap gap-1.5">
+                {COMBUSTIBLES.map(c => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => setCombustible(c)}
+                    className={`text-xs px-3 py-1.5 rounded-lg border font-medium ${
+                      combustible === c
+                        ? 'bg-red-50 border-red-300 text-red-700'
+                        : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                    }`}
+                  >
+                    {c}
+                  </button>
+                ))}
+              </div>
             </div>
+            {pedirKm && (
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Kilometraje al salir</label>
+                <input
+                  type="number"
+                  value={km}
+                  onChange={e => setKm(e.target.value)}
+                  placeholder="Ej: 45200"
+                  className="w-full text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:border-red-400"
+                />
+              </div>
+            )}
           </div>
 
           {/* Acciones */}
           <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">
             <button
-              onClick={() => { setShowForm(false); setPiloto(''); setError('') }}
+              onClick={() => { setShowForm(false); setPiloto(''); setKm(''); setError('') }}
               className="px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-50 rounded"
             >
               Cancelar
