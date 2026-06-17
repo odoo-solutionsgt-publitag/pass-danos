@@ -42,6 +42,41 @@ export async function imprimirPasePDF(pase) {
     }
   }
 
+  // "2026-06-16" → "16/06/2026"
+  function formatDate(dateStr) {
+    if (!dateStr) return ''
+    const parts = dateStr.split('-')
+    if (parts.length !== 3) return dateStr
+    return `${parts[2]}/${parts[1]}/${parts[0]}`
+  }
+
+  // "14:30" → "14:30 HRS."
+  function formatHora(timeStr) {
+    if (!timeStr) return ''
+    return `${timeStr} HRS.`
+  }
+
+  // TIMESTAMPTZ → "16/06/2026 14:30 HRS." en zona Guatemala
+  function formatDateTimeGT(ts) {
+    if (!ts) return ''
+    const d = new Date(ts)
+    const gt = new Date(d.toLocaleString('en-US', { timeZone: 'America/Guatemala' }))
+    const dd   = String(gt.getDate()).padStart(2, '0')
+    const mm   = String(gt.getMonth() + 1).padStart(2, '0')
+    const yyyy = gt.getFullYear()
+    const hh   = String(gt.getHours()).padStart(2, '0')
+    const min  = String(gt.getMinutes()).padStart(2, '0')
+    return `${dd}/${mm}/${yyyy} ${hh}:${min} HRS.`
+  }
+
+  // "3/8" → "3/8 TANQUE" / "Full" → "FULL TANQUE"
+  function setCombustible(fieldName, value) {
+    if (!value) return set(fieldName, '')
+    const upper = value.toString().trim().toUpperCase()
+    const formatted = upper.includes('TANQUE') ? upper : `${upper} TANQUE`
+    set(fieldName, formatted)
+  }
+
   // Correlativo y referencia
   set('no_pase_salida_interno', pase.numero ?? '')
   set('contrato_referencia',    pase.contrato_referencia ?? '')
@@ -52,25 +87,23 @@ export async function imprimirPasePDF(pase) {
   set('vehiculo_color',  pase.vehiculo_color ?? '')
 
   // Destino y piloto
-  set('lugar_taller',        pase.lugar_taller  ?? '')
-  set('piloto_pass',         pase.piloto_pass   ?? '')
-  set('combustible_salida',  pase.combustible_salida ?? '')
-  set('kilometraje_salida',  pase.kilometraje_salida != null ? String(pase.kilometraje_salida) : '')
-  set('fecha_salida',        pase.fecha_salida  ?? '')
-  set('hora_salida',         pase.hora_salida   ?? '')
+  set('lugar_taller',       pase.lugar_taller ?? '')
+  set('piloto_pass',        pase.piloto_pass  ?? '')
+  setCombustible('combustible_salida', pase.combustible_salida)
+  set('kilometraje_salida', pase.kilometraje_salida != null ? String(pase.kilometraje_salida) : '')
+  set('fecha_salida',       formatDate(pase.fecha_salida))
+  set('hora_salida',        formatHora(pase.hora_salida))
 
   // Datos de entrada (pueden estar vacíos si el pase está abierto)
-  set('combustible_entrada',  pase.combustible_entrada  ?? '')
-  set('kilometraje_entrada',  pase.kilometraje_entrada != null ? String(pase.kilometraje_entrada) : '')
-  set('fecha_entrada',        pase.fecha_entrada ?? '')
-  set('hora_entrada',         pase.hora_entrada  ?? '')
+  setCombustible('combustible_entrada', pase.combustible_entrada)
+  set('kilometraje_entrada', pase.kilometraje_entrada != null ? String(pase.kilometraje_entrada) : '')
+  set('fecha_entrada',       formatDate(pase.fecha_entrada))
+  set('hora_entrada',        formatHora(pase.hora_entrada))
 
   // Autorización y timestamp
   set('usuario_responsable', pase.usuario_responsable ?? '')
   set('motivo_salida',       MOTIVO_LABELS[pase.motivo_salida] ?? pase.motivo_salida ?? '')
-  set('fecha_hora_sistema',  pase.fecha_hora_sistema
-    ? new Date(pase.fecha_hora_sistema).toLocaleString('es-GT', { timeZone: 'America/Guatemala' })
-    : '')
+  set('fecha_hora_sistema',  formatDateTimeGT(pase.fecha_hora_sistema))
 
   form.flatten()
 

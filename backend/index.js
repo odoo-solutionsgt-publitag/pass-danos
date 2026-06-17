@@ -613,7 +613,7 @@ app.get('/vehiculos', async (req, res) => {
     if (req.query.placa) domain.push(['default_code', 'ilike', req.query.placa]);
 
     const vehiculos = await odooExecute(uid, 'product.template', 'search_read', [domain], {
-      fields: ['id', 'name', 'default_code', 'x_studio_tipo_de_vehiculo', 'x_studio_status_vehiculo', 'x_studio_tipo_de_servicio', 'x_studio_color_vehiculo', 'categ_id'],
+      fields: ['id', 'name', 'default_code', 'x_studio_tipo_de_vehiculo', 'x_studio_status_vehiculo', 'x_studio_tipo_de_servicio', 'x_studio_color_vehiculo', 'x_studio_marca', 'x_studio_linea', 'x_studio_modelo', 'categ_id'],
       order: 'default_code asc',
       limit: parseInt(req.query.limit) || 200,
     });
@@ -628,8 +628,9 @@ app.get('/vehiculos', async (req, res) => {
         status: v.x_studio_status_vehiculo || '',
         tipo_servicio: v.x_studio_tipo_de_servicio || '',
         color: v.x_studio_color_vehiculo || '',
-        marca: parsed.marca,
-        linea: parsed.linea,
+        marca: v.x_studio_marca || parsed.marca,
+        linea: v.x_studio_linea || parsed.linea,
+        modelo: v.x_studio_modelo || '',
         anio: parsed.anio,
       };
     });
@@ -653,7 +654,7 @@ app.get('/vehiculo/:placa', async (req, res) => {
     const vehiculos = await odooExecute(uid, 'product.template', 'search_read', [
       [['default_code', '=', placa]]
     ], {
-      fields: ['id', 'name', 'default_code', 'x_studio_tipo_de_vehiculo', 'x_studio_status_vehiculo', 'x_studio_color_vehiculo'],
+      fields: ['id', 'name', 'default_code', 'x_studio_tipo_de_vehiculo', 'x_studio_status_vehiculo', 'x_studio_color_vehiculo', 'x_studio_marca', 'x_studio_linea', 'x_studio_modelo'],
       limit: 1,
     });
 
@@ -709,8 +710,9 @@ app.get('/vehiculo/:placa', async (req, res) => {
         tipo_vehiculo: vehiculo.x_studio_tipo_de_vehiculo || '',
         status: vehiculo.x_studio_status_vehiculo || '',
         color: vehiculo.x_studio_color_vehiculo || '',
-        marca: parsed.marca,
-        linea: parsed.linea,
+        marca: vehiculo.x_studio_marca || parsed.marca,
+        linea: vehiculo.x_studio_linea || parsed.linea,
+        modelo: vehiculo.x_studio_modelo || '',
         anio: parsed.anio,
       },
       contrato,

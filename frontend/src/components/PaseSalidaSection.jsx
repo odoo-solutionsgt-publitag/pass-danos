@@ -66,8 +66,11 @@ export default function PaseSalidaSection({
   const [piloto, setPiloto]         = useState('')
   const [combustible, setCombustible] = useState('Full')
   const [km, setKm]                 = useState('')
+  const [lugar, setLugar]           = useState(tallerNombre || '')
   // Mostrar campo Km solo en Daños cuando no viene pre-llenado del registro
-  const pedirKm = esDano && kmInicial == null
+  const pedirKm    = esDano && kmInicial == null
+  // Mostrar campo Lugar editable solo en Daños (en Servicios viene del registro)
+  const pedirLugar = esDano
   const [cierre, setCierre]         = useState({ combustible_entrada: 'Full', kilometraje_entrada: '' })
   const [saving, setSaving]         = useState(false)
   const [error, setError]           = useState('')
@@ -97,14 +100,20 @@ export default function PaseSalidaSection({
     try {
       const { fecha, hora } = now_gt()
 
-      // Obtener color del vehículo desde Odoo (best-effort)
+      // Obtener datos del vehículo desde Odoo (best-effort): color + tipo/marca/linea directos
       let vehiculoColor = origen.vehiculo_color || ''
-      if (!vehiculoColor && origen.placa) {
+      let vehiculoTipo  = origen.vehiculo_tipo  ?? ''
+      if (origen.placa) {
         try {
           const vData = await fetchVehiculo(origen.placa)
-          vehiculoColor = vData.vehiculo?.color || ''
+          if (vData.vehiculo) {
+            const v = vData.vehiculo
+            vehiculoColor = v.color || vehiculoColor
+            const partes = [v.tipo_vehiculo, v.marca, v.linea, v.anio].filter(Boolean)
+            if (partes.length) vehiculoTipo = partes.join(' ')
+          }
         } catch {
-          // Color no crítico — continuar sin él
+          // Non-critical — continuar con datos del registro
         }
       }
 
@@ -114,11 +123,11 @@ export default function PaseSalidaSection({
           : { orden_servicio_id: origen.id }),
         contrato_referencia: origen.numero,
         vehiculo_placa:      origen.placa,
-        vehiculo_tipo:       origen.vehiculo_tipo  ?? '',
+        vehiculo_tipo:       vehiculoTipo,
         vehiculo_color:      vehiculoColor,
         odoo_product_id:     origen.odoo_product_id ?? null,
         motivo_salida:       motivoPreset ?? (esDano ? 'taller_reparacion' : 'taller_servicio'),
-        lugar_taller:        tallerNombre || null,
+        lugar_taller:        esDano ? (lugar.trim() || null) : (tallerNombre || null),
         piloto_pass:         piloto.trim(),
         combustible_salida:  combustible,
         kilometraje_salida:  kmInicial != null ? Number(kmInicial) : (km ? Number(km) : null),
@@ -141,6 +150,7 @@ export default function PaseSalidaSection({
       setPiloto('')
       setCombustible('Full')
       setKm('')
+      setLugar(tallerNombre || '')
 
       // Imprimir automáticamente al crear
       await imprimirPase(data)
@@ -266,7 +276,7 @@ export default function PaseSalidaSection({
       {showForm && (
         <div className="space-y-4">
           {/* Contexto (read-only, informativo) */}
-          {(motivoPreset || tallerNombre || kmInicial != null) && (
+          {(motivoPreset || (!esDano && tallerNombre) || (!pedirKm && kmInicial != null)) && (
             <div className="bg-gray-50 rounded-lg px-3 py-2.5 flex flex-wrap gap-4 text-xs text-gray-500">
               {motivoPreset && (
                 <span>
@@ -274,18 +284,34 @@ export default function PaseSalidaSection({
                   <span className="font-medium text-gray-700">{MOTIVO_LABELS[motivoPreset] ?? motivoPreset}</span>
                 </span>
               )}
-              {tallerNombre && (
+              {/* Para Servicios: destino viene del registro (read-only) */}
+              {!esDano && tallerNombre && (
                 <span>
                   <span className="text-gray-400">Destino: </span>
                   <span className="font-medium text-gray-700">{tallerNombre}</span>
                 </span>
               )}
-              {kmInicial != null && (
+              {/* Km pre-llenado desde el registro (Servicios) */}
+              {!pedirKm && kmInicial != null && (
                 <span>
                   <span className="text-gray-400">Km salida: </span>
                   <span className="font-medium text-gray-700">{Number(kmInicial).toLocaleString()}</span>
                 </span>
               )}
+            </div>
+          )}
+
+          {/* Lugar de destino (solo Daños — editable porque el taller puede no estar asignado aún) */}
+          {pedirLugar && (
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Lugar de destino</label>
+              <input
+                type="text"
+                value={lugar}
+                onChange={e => setLugar(e.target.value)}
+                placeholder="Ej: COFIÑO / MAJADAS"
+                className="w-full text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:border-red-400"
+              />
             </div>
           )}
 
@@ -342,7 +368,7 @@ export default function PaseSalidaSection({
           {/* Acciones */}
           <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">
             <button
-              onClick={() => { setShowForm(false); setPiloto(''); setKm(''); setError('') }}
+              onClick={() => { setShowForm(false); setPiloto(''); setKm(''); setLugar(tallerNombre || ''); setError('') }}
               className="px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-50 rounded"
             >
               Cancelar
