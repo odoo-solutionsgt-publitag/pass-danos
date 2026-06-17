@@ -62,7 +62,7 @@ export default function Dashboard() {
       const [
         { count: activos },
         { count: proformasPendientes },
-        { count: enReparacion },
+        { data: tallerData },
         { count: serviciosEnCurso },
         { data: ultimosSiniestros },
         { data: timeline },
@@ -71,7 +71,8 @@ export default function Dashboard() {
           .not('estado', 'in', '("cerrado","anulado")'),
         supabase.from('siniestros').select('*', { count: 'exact', head: true })
           .in('estado', ['proforma_emitida']),
-        supabase.from('taller_ingresos').select('*', { count: 'exact', head: true })
+        supabase.from('taller_ingresos')
+          .select('id,siniestro_id,orden_servicio_id,siniestros(estado),ordenes_servicio(estado)')
           .is('fecha_egreso', null),
         supabase.from('ordenes_servicio').select('*', { count: 'exact', head: true })
           .eq('estado', 'en_proceso'),
@@ -81,7 +82,14 @@ export default function Dashboard() {
           .order('created_at', { ascending: false }).limit(10),
       ])
 
-      setKpis({ activos: activos ?? 0, proformasPendientes: proformasPendientes ?? 0, enReparacion: enReparacion ?? 0, serviciosEnCurso: serviciosEnCurso ?? 0 })
+      // Excluir taller_ingresos de daños anulados/cerrados y servicios completados/cancelados
+      const enReparacion = (tallerData ?? []).filter(t => {
+        if (t.siniestro_id) return t.siniestros && !['cerrado', 'anulado'].includes(t.siniestros.estado)
+        if (t.orden_servicio_id) return t.ordenes_servicio && !['completado', 'cancelado'].includes(t.ordenes_servicio.estado)
+        return false
+      }).length
+
+      setKpis({ activos: activos ?? 0, proformasPendientes: proformasPendientes ?? 0, enReparacion, serviciosEnCurso: serviciosEnCurso ?? 0 })
       setSiniestros(ultimosSiniestros ?? [])
       setActividad(timeline ?? [])
     } catch (err) {

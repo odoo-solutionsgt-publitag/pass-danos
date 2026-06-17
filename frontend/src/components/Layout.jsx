@@ -31,7 +31,7 @@ export default function Layout() {
                 title="Crear nueva orden de servicio (mantenimiento)"
               >
                 <Wrench size={15} />
-                Nueva orden
+                Nuevo Servicio
               </button>
               <button
                 onClick={() => navigate('/siniestros/nuevo')}
