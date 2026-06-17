@@ -6,7 +6,7 @@ export async function imprimirPasePDF(pase) {
   const { PDFDocument } = await import('pdf-lib')
 
   // URL absoluta para evitar problemas con rutas relativas en producción
-  const pdfUrl = `${window.location.origin}/pdfs/Pase-Salida-Interno-Pass.pdf`
+  const pdfUrl = `${window.location.origin}/pdfs/Pase-Salida-Interno-Pass-2026.pdf`
   const res = await fetch(pdfUrl, { cache: 'no-store' })
 
   if (!res.ok) {
