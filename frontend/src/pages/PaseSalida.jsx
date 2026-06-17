@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { Search, ClipboardList, Printer, CheckCircle2, XCircle, Loader2, AlertCircle, Plus, Car } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { imprimirPasePDF } from '../lib/pase-pdf'
@@ -65,6 +65,7 @@ function now_gt() {
 
 export default function PaseSalida() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { puedeCrear, puedeEditar } = usePermisos()
   const { perfil } = useAuth()
 
@@ -91,6 +92,34 @@ export default function PaseSalida() {
   const debounceRef                     = useRef(null)
 
   useEffect(() => { loadPases() }, [filtroEstado])
+
+  // Auto-abrir modal con placa pre-cargada cuando viene desde Flota o Bitácora
+  useEffect(() => {
+    const placa = location.state?.preloadPlaca
+    if (!placa || !puedeCrear) return
+    setShowNuevo(true)
+    setErrorNuevo('')
+    setForm({ ...FORM_INIT, placaBusqueda: placa })
+    // Buscar el vehículo automáticamente
+    buscarPlacaDirecta(placa)
+    // Limpiar el state para que no se repita al navegar de vuelta
+    window.history.replaceState({}, '')
+  }, [location.state?.preloadPlaca, puedeCrear])
+
+  async function buscarPlacaDirecta(placa) {
+    try {
+      const data = await fetchVehiculos({ placa, limit: 5 })
+      const lista = data.vehiculos ?? []
+      // Si hay exacta, seleccionarla directamente
+      const exacto = lista.find(v => v.placa === placa) ?? lista[0]
+      if (exacto) {
+        setForm(f => ({ ...f, placaBusqueda: exacto.placa, vehiculo: exacto }))
+        setSugerencias([])
+      } else {
+        setSugerencias(lista)
+      }
+    } catch { /* silencioso */ }
+  }
 
   async function loadPases() {
     setLoading(true)

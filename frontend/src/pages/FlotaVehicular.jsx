@@ -1,11 +1,25 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { RefreshCw, Search, X, Car, Calendar, User, Phone, Mail, FileText, AlertCircle } from 'lucide-react'
+import { RefreshCw, Search, X, Car, Calendar, User, Phone, Mail, FileText, AlertCircle, ClipboardList } from 'lucide-react'
 import { fetchVehiculos, fetchVehiculo } from '../lib/odoo-api'
 import { supabase } from '../lib/supabase'
 import { siniestrosQuery, ordenesServicioQuery } from '../lib/queries'
 import { usePermisos } from '../hooks/usePermisos'
 import { formatDate as fmtDateLib } from '../lib/fecha'
+
+const MOTIVO_LABELS_PASE = {
+  taller_reparacion: 'Taller x Reparación',
+  taller_servicio:   'Taller x Servicio',
+  gasolinera:        'Gasolinera',
+  diligencias:       'Diligencias adm.',
+  asignado_personal: 'Asignado al personal',
+}
+
+const ESTADO_PASE_BADGE = {
+  abierto: 'bg-amber-100 text-amber-700',
+  cerrado: 'bg-green-100 text-green-700',
+  anulado: 'bg-gray-100 text-gray-500',
+}
 
 // Valores actualizados del campo x_studio_status_vehiculo en Odoo.
 // Internas: 'Reparación' (antes "En Reparación"), 'Servicio' (antes
@@ -267,6 +281,7 @@ function VehiculoDrawer({ vehiculo, onClose }) {
   const [detalle, setDetalle]     = useState(null)
   const [siniestros, setSinies]   = useState([])
   const [servicios, setServicios] = useState([])
+  const [pases, setPases]         = useState([])
   const [loading, setLoading]     = useState(true)
   const [error, setError]         = useState('')
 
@@ -278,7 +293,7 @@ function VehiculoDrawer({ vehiculo, onClose }) {
       setLoading(true)
       setError('')
       try {
-        const [detalleRes, sinRes, srvRes] = await Promise.all([
+        const [detalleRes, sinRes, srvRes, pasesRes] = await Promise.all([
           fetchVehiculo(vehiculo.placa).catch(err => ({ _err: err.message })),
           siniestrosQuery('id,numero,fecha_dano,tipo_dano,severidad,estado,total_general:costo_pass')
             .eq('placa', vehiculo.placa)
@@ -288,12 +303,20 @@ function VehiculoDrawer({ vehiculo, onClose }) {
             .eq('placa', vehiculo.placa)
             .order('created_at', { ascending: false })
             .limit(10),
+          supabase
+            .from('pases_salida')
+            .select('id,numero,motivo_salida,piloto_pass,fecha_salida,hora_salida,estado')
+            .eq('vehiculo_placa', vehiculo.placa)
+            .neq('estado', 'anulado')
+            .order('created_at', { ascending: false })
+            .limit(5),
         ])
         if (cancel) return
         if (detalleRes._err) setError(detalleRes._err)
         else setDetalle(detalleRes)
         setSinies(sinRes.data ?? [])
         setServicios(srvRes.data ?? [])
+        setPases(pasesRes.data ?? [])
       } catch (err) {
         if (!cancel) setError(err.message)
       } finally {
@@ -436,6 +459,40 @@ function VehiculoDrawer({ vehiculo, onClose }) {
             )}
           </div>
 
+          {/* Historial de pases de salida */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-1.5">
+                <ClipboardList size={13} className="text-gray-400" />
+                Pases de salida
+              </h3>
+              <span className="text-xs text-gray-400">{pases.length}</span>
+            </div>
+            {pases.length === 0 ? (
+              <p className="text-xs text-gray-400 italic">Sin pases de salida</p>
+            ) : (
+              <div className="space-y-1.5">
+                {pases.map(p => (
+                  <div
+                    key={p.id}
+                    className="w-full bg-gray-50 border border-gray-100 rounded-lg px-3 py-2"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs font-mono font-semibold text-gray-700">{p.numero}</span>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${ESTADO_PASE_BADGE[p.estado]}`}>
+                        {p.estado}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between gap-2 mt-0.5">
+                      <span className="text-xs text-gray-500 truncate">{MOTIVO_LABELS_PASE[p.motivo_salida] ?? p.motivo_salida}</span>
+                      <span className="text-xs text-gray-400 whitespace-nowrap">{p.fecha_salida}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           <div className="pt-3 border-t border-gray-100 space-y-2">
             <button
               onClick={() => { onClose(); navigate(`/bitacora/${vehiculo.placa}`) }}
@@ -444,18 +501,24 @@ function VehiculoDrawer({ vehiculo, onClose }) {
               <FileText size={14} /> Ver bitácora completa
             </button>
             {puedeCrear && (
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 <button
                   onClick={() => { onClose(); navigate('/siniestros/nuevo', { state: { placa: vehiculo.placa } }) }}
-                  className="text-sm bg-red-600 hover:bg-red-700 text-white font-medium py-2 rounded-lg"
+                  className="text-xs bg-red-600 hover:bg-red-700 text-white font-medium py-2 rounded-lg"
                 >
                   + Daño
                 </button>
                 <button
                   onClick={() => { onClose(); navigate('/servicios/nuevo', { state: { placa: vehiculo.placa } }) }}
-                  className="text-sm bg-gray-900 hover:bg-gray-800 text-white font-medium py-2 rounded-lg"
+                  className="text-xs bg-gray-900 hover:bg-gray-800 text-white font-medium py-2 rounded-lg"
                 >
                   + Servicio
+                </button>
+                <button
+                  onClick={() => { onClose(); navigate('/pases-salida', { state: { preloadPlaca: vehiculo.placa } }) }}
+                  className="text-xs bg-amber-600 hover:bg-amber-700 text-white font-medium py-2 rounded-lg"
+                >
+                  + Pase
                 </button>
               </div>
             )}

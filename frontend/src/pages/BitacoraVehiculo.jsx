@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import {
   Car, FileText, User, Calendar, Phone, Mail, Hash,
-  AlertTriangle, Wrench, Clock, Plus, Printer, ExternalLink, RefreshCw,
+  AlertTriangle, Wrench, Clock, Plus, Printer, ExternalLink, RefreshCw, ClipboardList,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { fetchVehiculo } from '../lib/odoo-api'
@@ -72,6 +72,7 @@ export default function BitacoraVehiculo() {
   const [odooData, setOdooData] = useState(null)
   const [siniestros, setSinies] = useState([])
   const [servicios, setServicios] = useState([])
+  const [pases, setPases]       = useState([])
   const [documentos, setDocumentos] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -84,13 +85,19 @@ export default function BitacoraVehiculo() {
     setError('')
     try {
       const placaUp = placa.toUpperCase()
-      const [odooRes, sinRes, srvRes] = await Promise.all([
+      const [odooRes, sinRes, srvRes, pasesRes] = await Promise.all([
         fetchVehiculo(placaUp).catch(err => ({ _err: err.message })),
         siniestrosQuery('id, numero, fecha_dano, tipo_dano, severidad, estado, descripcion, monto_cliente, costo_pass, margen, lugar_accidente')
           .eq('placa', placaUp)
           .order('created_at', { ascending: false }),
         ordenesServicioQuery('id, numero, fecha_programada, tipo_servicio, estado, total_general, kilometraje, descripcion, talleres(nombre)')
           .eq('placa', placaUp)
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('pases_salida')
+          .select('id, numero, motivo_salida, piloto_pass, lugar_taller, fecha_salida, hora_salida, kilometraje_salida, kilometraje_entrada, estado, contrato_referencia')
+          .eq('vehiculo_placa', placaUp)
+          .neq('estado', 'anulado')
           .order('created_at', { ascending: false }),
       ])
 
@@ -101,6 +108,7 @@ export default function BitacoraVehiculo() {
       const servs = srvRes.data ?? []
       setSinies(sinies)
       setServicios(servs)
+      setPases(pasesRes.data ?? [])
 
       // documentos del vehículo (vinculados a sus siniestros o servicios)
       const sinIds = sinies.map(s => s.id)
@@ -254,6 +262,12 @@ export default function BitacoraVehiculo() {
             >
               <Wrench size={15} /> Nueva orden
             </button>
+            <button
+              onClick={() => navigate('/pases-salida', { state: { preloadPlaca: placa?.toUpperCase() } })}
+              className="flex items-center gap-2 bg-amber-600 hover:bg-amber-700 text-white text-sm font-medium px-4 py-2 rounded-lg"
+            >
+              <ClipboardList size={15} /> Pase de salida
+            </button>
           </>
         )}
         <button
@@ -352,6 +366,63 @@ export default function BitacoraVehiculo() {
                   <td className="px-5 py-2.5 text-right text-gray-700 whitespace-nowrap">{fmt(o.total_general)}</td>
                   <td className="px-5 py-2.5">
                     <ExternalLink size={14} className="text-gray-300" />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </section>
+
+      {/* Historial de Pases de Salida */}
+      <section className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="px-5 py-3 border-b border-gray-100 flex items-center gap-2">
+          <ClipboardList size={15} className="text-amber-500" />
+          <h2 className="text-sm font-semibold text-gray-800">Historial de pases de salida</h2>
+          <span className="text-xs text-gray-400">({pases.length})</span>
+        </div>
+        {pases.length === 0 ? (
+          <p className="px-5 py-8 text-center text-sm text-gray-400">Sin pases de salida registrados</p>
+        ) : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-gray-50 text-xs text-gray-500">
+                <th className="text-left px-5 py-2 font-medium">No. Pase</th>
+                <th className="text-left px-5 py-2 font-medium">Fecha</th>
+                <th className="text-left px-5 py-2 font-medium">Motivo</th>
+                <th className="text-left px-5 py-2 font-medium">Piloto</th>
+                <th className="text-left px-5 py-2 font-medium">Destino</th>
+                <th className="text-left px-5 py-2 font-medium">Km Salida</th>
+                <th className="text-left px-5 py-2 font-medium">Estado</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {pases.map(p => (
+                <tr key={p.id} className="hover:bg-gray-50">
+                  <td className="px-5 py-2.5 font-mono font-semibold text-amber-700 text-xs">{p.numero}</td>
+                  <td className="px-5 py-2.5 text-gray-600 whitespace-nowrap text-xs">{p.fecha_salida} {p.hora_salida}</td>
+                  <td className="px-5 py-2.5 text-gray-700 text-xs">
+                    {{
+                      taller_reparacion: 'Taller x Reparación',
+                      taller_servicio:   'Taller x Servicio',
+                      gasolinera:        'Gasolinera',
+                      diligencias:       'Diligencias adm.',
+                      asignado_personal: 'Asignado al personal',
+                    }[p.motivo_salida] ?? p.motivo_salida}
+                  </td>
+                  <td className="px-5 py-2.5 text-gray-600 text-xs">{p.piloto_pass || '—'}</td>
+                  <td className="px-5 py-2.5 text-gray-600 text-xs">{p.lugar_taller || '—'}</td>
+                  <td className="px-5 py-2.5 text-gray-600 text-xs">
+                    {p.kilometraje_salida != null ? Number(p.kilometraje_salida).toLocaleString('es-GT') + ' km' : '—'}
+                  </td>
+                  <td className="px-5 py-2.5">
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${{
+                      abierto: 'bg-amber-100 text-amber-700',
+                      cerrado: 'bg-green-100 text-green-700',
+                      anulado: 'bg-gray-100 text-gray-500',
+                    }[p.estado]}`}>
+                      {p.estado}
+                    </span>
                   </td>
                 </tr>
               ))}
