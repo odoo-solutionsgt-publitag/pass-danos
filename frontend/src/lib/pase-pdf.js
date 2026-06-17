@@ -5,10 +5,30 @@
 export async function imprimirPasePDF(pase) {
   const { PDFDocument } = await import('pdf-lib')
 
-  const pdfUrl = '/pdfs/Pase-Salida-Interno-Pass.pdf'
-  const res = await fetch(pdfUrl)
-  if (!res.ok) throw new Error(`No se pudo cargar el PDF base: ${res.status} ${res.statusText}`)
+  // URL absoluta para evitar problemas con rutas relativas en producción
+  const pdfUrl = `${window.location.origin}/pdfs/Pase-Salida-Interno-Pass.pdf`
+  const res = await fetch(pdfUrl, { cache: 'no-store' })
+
+  if (!res.ok) {
+    throw new Error(
+      `Archivo PDF no encontrado en el servidor (HTTP ${res.status}). ` +
+      `Verifique que el deploy del frontend esté completo.`
+    )
+  }
+
   const pdfBytes = await res.arrayBuffer()
+
+  // Verificar magic bytes %PDF antes de intentar parsear
+  const magic = new Uint8Array(pdfBytes.slice(0, 4))
+  const isPDF = magic[0] === 0x25 && magic[1] === 0x50 && // %P
+                magic[2] === 0x44 && magic[3] === 0x46    // DF
+  if (!isPDF) {
+    const preview = Array.from(magic).map(b => String.fromCharCode(b)).join('')
+    throw new Error(
+      `El servidor devolvió contenido inválido (primeros bytes: "${preview}"). ` +
+      `Es posible que el deploy no haya completado aún. Intente recargar la página.`
+    )
+  }
 
   const pdfDoc = await PDFDocument.load(pdfBytes, { ignoreEncryption: true })
   const form = pdfDoc.getForm()
@@ -17,7 +37,7 @@ export async function imprimirPasePDF(pase) {
     try {
       form.getTextField(fieldName).setText(value ?? '')
     } catch {
-      // Campo no encontrado — continuar sin error
+      // Campo no encontrado en el AcroForm — continuar sin error
     }
   }
 
@@ -59,7 +79,7 @@ export async function imprimirPasePDF(pase) {
 
   const win = window.open(blobUrl, '_blank')
   if (!win) {
-    // Fallback si el navegador bloqueó la ventana
+    // Fallback si el navegador bloqueó la ventana emergente
     const a = document.createElement('a')
     a.href = blobUrl
     a.download = `PASE-${pase.numero ?? 'salida'}.pdf`

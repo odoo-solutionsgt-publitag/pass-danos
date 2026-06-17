@@ -4,15 +4,15 @@ import { supabase } from '../lib/supabase'
 import { imprimirPasePDF } from '../lib/pase-pdf'
 import { usePermisos } from '../hooks/usePermisos'
 
-// ─── Constantes de UI ──────────────────────────────────────────────────────────
+// ─── Constantes ────────────────────────────────────────────────────────────────
 
-const MOTIVOS = [
-  { value: 'taller_reparacion', label: 'Taller x Reparación' },
-  { value: 'taller_servicio',   label: 'Taller x Servicio'   },
-  { value: 'gasolinera',        label: 'Gasolinera'           },
-  { value: 'diligencias',       label: 'Diligencias adm.'    },
-  { value: 'asignado_personal', label: 'Asignado al personal' },
-]
+const MOTIVO_LABELS = {
+  taller_reparacion: 'Taller x Reparación',
+  taller_servicio:   'Taller x Servicio',
+  gasolinera:        'Gasolinera',
+  diligencias:       'Diligencias adm.',
+  asignado_personal: 'Asignado al personal',
+}
 
 const COMBUSTIBLES = ['Full', '7/8', '6/8', '5/8', '1/2', '3/8', '1/8']
 
@@ -35,39 +35,38 @@ function now_gt() {
   }
 }
 
-// ─── Formulario nuevo pase ─────────────────────────────────────────────────────
-
-const FORM_VACIO = {
-  piloto_pass:        '',
-  motivo_salida:      'taller_reparacion',
-  lugar_taller:       '',
-  combustible_salida: 'Full',
-  kilometraje_salida: '',
-}
-
 // ─── Componente principal ──────────────────────────────────────────────────────
 
 /**
  * Props:
- *  - siniestro: objeto del daño  { id, numero, placa, odoo_product_id, vehiculo_tipo, vehiculo_color, registrado_por_nombre }
- *    O bien:
- *  - servicio:  objeto del servicio { id, numero, placa, odoo_product_id, vehiculo_tipo, vehiculo_color, registrado_por_nombre }
- *  - userName:  nombre del usuario autenticado (para usuario_responsable)
+ *  - siniestro / servicio: objeto origen { id, numero, placa, odoo_product_id, vehiculo_tipo, vehiculo_color }
+ *  - userName: nombre del usuario autenticado
+ *  - motivoPreset: string enum — motivo pre-seleccionado del contexto (no se muestra en form)
+ *  - tallerNombre: nombre del taller ya asignado al registro (pre-llena lugar_taller)
+ *  - kmInicial: kilometraje actual del vehículo (pre-llena kilometraje_salida)
  */
-export default function PaseSalidaSection({ siniestro, servicio, userName = '' }) {
+export default function PaseSalidaSection({
+  siniestro,
+  servicio,
+  userName = '',
+  motivoPreset = null,
+  tallerNombre = '',
+  kmInicial = null,
+}) {
   const { puedeCrear, puedeEditar } = usePermisos()
 
   const origen = siniestro ?? servicio
   const esDano  = !!siniestro
 
-  const [pase, setPase]           = useState(null)   // pase activo (o null)
-  const [loading, setLoading]     = useState(true)
-  const [showForm, setShowForm]   = useState(false)
+  const [pase, setPase]             = useState(null)
+  const [loading, setLoading]       = useState(true)
+  const [showForm, setShowForm]     = useState(false)
   const [showCierre, setShowCierre] = useState(false)
-  const [form, setForm]           = useState({ ...FORM_VACIO })
-  const [cierre, setCierre]       = useState({ combustible_entrada: 'Full', kilometraje_entrada: '' })
-  const [saving, setSaving]       = useState(false)
-  const [error, setError]         = useState('')
+  const [piloto, setPiloto]         = useState('')
+  const [combustible, setCombustible] = useState('Full')
+  const [cierre, setCierre]         = useState({ combustible_entrada: 'Full', kilometraje_entrada: '' })
+  const [saving, setSaving]         = useState(false)
+  const [error, setError]           = useState('')
   const [printLoading, setPrintLoading] = useState(false)
 
   useEffect(() => { loadPase() }, [origen?.id])
@@ -89,8 +88,7 @@ export default function PaseSalidaSection({ siniestro, servicio, userName = '' }
   // ── Crear nuevo pase ──────────────────────────────────────────────────────
 
   async function crearPase() {
-    if (!form.piloto_pass.trim()) { setError('El nombre del piloto es requerido.'); return }
-    if (!form.motivo_salida)      { setError('Selecciona un motivo de salida.');    return }
+    if (!piloto.trim()) { setError('El nombre del piloto es requerido.'); return }
     setSaving(true); setError('')
     try {
       const { fecha, hora } = now_gt()
@@ -103,16 +101,15 @@ export default function PaseSalidaSection({ siniestro, servicio, userName = '' }
         vehiculo_tipo:       origen.vehiculo_tipo  ?? '',
         vehiculo_color:      origen.vehiculo_color ?? '',
         odoo_product_id:     origen.odoo_product_id ?? null,
-        motivo_salida:       form.motivo_salida,
-        lugar_taller:        form.lugar_taller.trim() || null,
-        piloto_pass:         form.piloto_pass.trim(),
-        combustible_salida:  form.combustible_salida,
-        kilometraje_salida:  form.kilometraje_salida ? Number(form.kilometraje_salida) : null,
+        motivo_salida:       motivoPreset ?? (esDano ? 'taller_reparacion' : 'taller_servicio'),
+        lugar_taller:        tallerNombre || null,
+        piloto_pass:         piloto.trim(),
+        combustible_salida:  combustible,
+        kilometraje_salida:  kmInicial != null ? Number(kmInicial) : null,
         fecha_salida:        fecha,
         hora_salida:         hora,
         usuario_responsable: userName || origen.registrado_por_nombre || '',
         estado:              'abierto',
-        // numero lo genera el trigger
       }
 
       const { data, error: dbErr } = await supabase
@@ -125,7 +122,8 @@ export default function PaseSalidaSection({ siniestro, servicio, userName = '' }
 
       setPase(data)
       setShowForm(false)
-      setForm({ ...FORM_VACIO })
+      setPiloto('')
+      setCombustible('Full')
 
       // Imprimir automáticamente al crear
       await imprimirPase(data)
@@ -224,9 +222,11 @@ export default function PaseSalidaSection({ siniestro, servicio, userName = '' }
         </div>
       )}
 
-      {/* Estado: cargando */}
+      {/* Cargando */}
       {loading && (
-        <p className="text-xs text-gray-400 flex items-center gap-1.5"><Loader2 size={12} className="animate-spin" />Cargando…</p>
+        <p className="text-xs text-gray-400 flex items-center gap-1.5">
+          <Loader2 size={12} className="animate-spin" />Cargando…
+        </p>
       )}
 
       {/* Sin pase activo → botón crear */}
@@ -245,91 +245,73 @@ export default function PaseSalidaSection({ siniestro, servicio, userName = '' }
         </div>
       )}
 
-      {/* Formulario de creación */}
+      {/* Formulario simplificado: solo Piloto + Combustible */}
       {showForm && (
         <div className="space-y-4">
+          {/* Contexto (read-only, informativo) */}
+          {(motivoPreset || tallerNombre || kmInicial != null) && (
+            <div className="bg-gray-50 rounded-lg px-3 py-2.5 flex flex-wrap gap-4 text-xs text-gray-500">
+              {motivoPreset && (
+                <span>
+                  <span className="text-gray-400">Motivo: </span>
+                  <span className="font-medium text-gray-700">{MOTIVO_LABELS[motivoPreset] ?? motivoPreset}</span>
+                </span>
+              )}
+              {tallerNombre && (
+                <span>
+                  <span className="text-gray-400">Destino: </span>
+                  <span className="font-medium text-gray-700">{tallerNombre}</span>
+                </span>
+              )}
+              {kmInicial != null && (
+                <span>
+                  <span className="text-gray-400">Km salida: </span>
+                  <span className="font-medium text-gray-700">{Number(kmInicial).toLocaleString()}</span>
+                </span>
+              )}
+            </div>
+          )}
+
           {/* Piloto */}
           <div>
-            <label className="block text-xs text-gray-500 mb-1">Nombre del piloto <span className="text-red-500">*</span></label>
+            <label className="block text-xs text-gray-500 mb-1">
+              Nombre del piloto <span className="text-red-500">*</span>
+            </label>
             <input
               type="text"
-              value={form.piloto_pass}
-              onChange={e => setForm(f => ({ ...f, piloto_pass: e.target.value }))}
+              value={piloto}
+              onChange={e => setPiloto(e.target.value)}
               placeholder="Ej: Juan Pérez"
               className="w-full text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:border-red-400"
+              autoFocus
             />
           </div>
 
-          {/* Motivo */}
+          {/* Combustible */}
           <div>
-            <label className="block text-xs text-gray-500 mb-2">Motivo de salida <span className="text-red-500">*</span></label>
-            <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
-              {MOTIVOS.map(m => (
+            <label className="block text-xs text-gray-500 mb-2">Combustible al salir</label>
+            <div className="flex flex-wrap gap-1.5">
+              {COMBUSTIBLES.map(c => (
                 <button
-                  key={m.value}
+                  key={c}
                   type="button"
-                  onClick={() => setForm(f => ({ ...f, motivo_salida: m.value }))}
-                  className={`text-xs px-2 py-2 rounded-lg border text-left leading-tight ${
-                    form.motivo_salida === m.value
-                      ? 'bg-red-50 border-red-300 text-red-700 font-medium'
+                  onClick={() => setCombustible(c)}
+                  className={`text-xs px-3 py-1.5 rounded-lg border font-medium ${
+                    combustible === c
+                      ? 'bg-red-50 border-red-300 text-red-700'
                       : 'border-gray-200 text-gray-600 hover:bg-gray-50'
                   }`}
                 >
-                  {m.label}
+                  {c}
                 </button>
               ))}
-            </div>
-          </div>
-
-          {/* Lugar/Taller */}
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">Lugar / Taller de destino</label>
-            <input
-              type="text"
-              value={form.lugar_taller}
-              onChange={e => setForm(f => ({ ...f, lugar_taller: e.target.value }))}
-              placeholder="Ej: REASA Zona 12"
-              className="w-full text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:border-red-400"
-            />
-          </div>
-
-          {/* Combustible + Km */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs text-gray-500 mb-2">Combustible al salir</label>
-              <div className="flex flex-wrap gap-1">
-                {COMBUSTIBLES.map(c => (
-                  <button
-                    key={c}
-                    type="button"
-                    onClick={() => setForm(f => ({ ...f, combustible_salida: c }))}
-                    className={`text-xs px-2 py-1 rounded border ${
-                      form.combustible_salida === c
-                        ? 'bg-red-50 border-red-300 text-red-700 font-medium'
-                        : 'border-gray-200 text-gray-600 hover:bg-gray-50'
-                    }`}
-                  >
-                    {c}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">Kilometraje al salir</label>
-              <input
-                type="number"
-                value={form.kilometraje_salida}
-                onChange={e => setForm(f => ({ ...f, kilometraje_salida: e.target.value }))}
-                placeholder="Ej: 45200"
-                className="w-full text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:border-red-400"
-              />
             </div>
           </div>
 
           {/* Acciones */}
           <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">
             <button
-              onClick={() => { setShowForm(false); setError('') }}
+              onClick={() => { setShowForm(false); setPiloto(''); setError('') }}
               className="px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-50 rounded"
             >
               Cancelar
@@ -349,7 +331,7 @@ export default function PaseSalidaSection({ siniestro, servicio, userName = '' }
       {/* Pase existente */}
       {!loading && pase && !showForm && (
         <div className="space-y-3">
-          {/* Resumen del pase */}
+          {/* Resumen */}
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
             <div>
               <p className="text-gray-400">No. Pase</p>
@@ -362,17 +344,19 @@ export default function PaseSalidaSection({ siniestro, servicio, userName = '' }
             <div>
               <p className="text-gray-400">Motivo</p>
               <p className="font-medium text-gray-700">
-                {MOTIVOS.find(m => m.value === pase.motivo_salida)?.label ?? pase.motivo_salida}
+                {MOTIVO_LABELS[pase.motivo_salida] ?? pase.motivo_salida}
               </p>
             </div>
             <div>
               <p className="text-gray-400">Combustible salida</p>
               <p className="font-medium text-gray-700">{pase.combustible_salida}</p>
             </div>
-            <div>
-              <p className="text-gray-400">Km salida</p>
-              <p className="font-medium text-gray-700">{pase.kilometraje_salida ?? '—'}</p>
-            </div>
+            {pase.kilometraje_salida != null && (
+              <div>
+                <p className="text-gray-400">Km salida</p>
+                <p className="font-medium text-gray-700">{Number(pase.kilometraje_salida).toLocaleString()}</p>
+              </div>
+            )}
             <div>
               <p className="text-gray-400">Fecha / Hora salida</p>
               <p className="font-medium text-gray-700">{pase.fecha_salida} {pase.hora_salida}</p>
@@ -389,10 +373,12 @@ export default function PaseSalidaSection({ siniestro, servicio, userName = '' }
                   <p className="text-gray-400">Combustible entrada</p>
                   <p className="font-medium text-gray-700">{pase.combustible_entrada}</p>
                 </div>
-                <div>
-                  <p className="text-gray-400">Km entrada</p>
-                  <p className="font-medium text-gray-700">{pase.kilometraje_entrada ?? '—'}</p>
-                </div>
+                {pase.kilometraje_entrada != null && (
+                  <div>
+                    <p className="text-gray-400">Km entrada</p>
+                    <p className="font-medium text-gray-700">{Number(pase.kilometraje_entrada).toLocaleString()}</p>
+                  </div>
+                )}
                 <div>
                   <p className="text-gray-400">Fecha / Hora entrada</p>
                   <p className="font-medium text-gray-700">{pase.fecha_entrada} {pase.hora_entrada}</p>
@@ -437,7 +423,10 @@ export default function PaseSalidaSection({ siniestro, servicio, userName = '' }
                 </div>
               </div>
               <div className="flex justify-end gap-2">
-                <button onClick={() => setShowCierre(false)} className="px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-100 rounded">
+                <button
+                  onClick={() => setShowCierre(false)}
+                  className="px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-100 rounded"
+                >
                   Cancelar
                 </button>
                 <button
@@ -454,7 +443,6 @@ export default function PaseSalidaSection({ siniestro, servicio, userName = '' }
 
           {/* Botones de acción */}
           <div className="flex flex-wrap gap-2 pt-1">
-            {/* Re-imprimir */}
             <button
               onClick={() => imprimirPase()}
               disabled={printLoading}
@@ -464,7 +452,6 @@ export default function PaseSalidaSection({ siniestro, servicio, userName = '' }
               {printLoading ? 'Generando PDF…' : 'Ver / Imprimir PDF'}
             </button>
 
-            {/* Cerrar pase */}
             {puedeEditar && pase.estado === 'abierto' && !showCierre && (
               <button
                 onClick={() => { setShowCierre(true); setError('') }}
@@ -475,7 +462,6 @@ export default function PaseSalidaSection({ siniestro, servicio, userName = '' }
               </button>
             )}
 
-            {/* Anular */}
             {puedeEditar && pase.estado === 'abierto' && (
               <button
                 onClick={anularPase}

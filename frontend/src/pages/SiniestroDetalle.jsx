@@ -661,15 +661,16 @@ export default function SiniestroDetalle() {
         {!['cerrado', 'anulado'].includes(estado) && (
           <PaseSalidaSection
             siniestro={{
-              id:                    siniestro.id,
-              numero:                siniestro.numero,
-              placa:                 siniestro.placa,
-              odoo_product_id:       siniestro.odoo_product_id,
-              vehiculo_tipo:         [siniestro.marca, siniestro.linea, siniestro.anio].filter(Boolean).join(' '),
-              vehiculo_color:        siniestro.vehiculo_color ?? '',
-              registrado_por_nombre: siniestro.registrado_por_nombre ?? '',
+              id:              siniestro.id,
+              numero:          siniestro.numero,
+              placa:           siniestro.placa,
+              odoo_product_id: siniestro.odoo_product_id,
+              vehiculo_tipo:   [siniestro.marca, siniestro.linea, siniestro.anio].filter(Boolean).join(' '),
+              vehiculo_color:  siniestro.vehiculo_color ?? '',
             }}
             userName={perfil?.nombre_completo}
+            motivoPreset="taller_reparacion"
+            tallerNombre={siniestro.talleres?.nombre ?? ''}
           />
         )}
 

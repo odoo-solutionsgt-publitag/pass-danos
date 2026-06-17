@@ -676,15 +676,17 @@ export default function ServicioDetalle() {
         {!['completado', 'cancelado'].includes(estado) && (
           <PaseSalidaSection
             servicio={{
-              id:                    orden.id,
-              numero:                orden.numero,
-              placa:                 orden.placa,
-              odoo_product_id:       orden.odoo_product_id,
-              vehiculo_tipo:         orden.tipo_vehiculo ?? '',
-              vehiculo_color:        orden.vehiculo_color ?? '',
-              registrado_por_nombre: orden.registrado_por_nombre ?? '',
+              id:              orden.id,
+              numero:          orden.numero,
+              placa:           orden.placa,
+              odoo_product_id: orden.odoo_product_id,
+              vehiculo_tipo:   orden.tipo_vehiculo ?? '',
+              vehiculo_color:  orden.vehiculo_color ?? '',
             }}
             userName={perfil?.nombre_completo}
+            motivoPreset="taller_servicio"
+            tallerNombre={orden.talleres?.nombre ?? ''}
+            kmInicial={orden.kilometraje ?? null}
           />
         )}
 
