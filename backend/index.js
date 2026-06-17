@@ -613,7 +613,7 @@ app.get('/vehiculos', async (req, res) => {
     if (req.query.placa) domain.push(['default_code', 'ilike', req.query.placa]);
 
     const vehiculos = await odooExecute(uid, 'product.template', 'search_read', [domain], {
-      fields: ['id', 'name', 'default_code', 'x_studio_tipo_de_vehiculo', 'x_studio_status_vehiculo', 'x_studio_tipo_de_servicio', 'categ_id'],
+      fields: ['id', 'name', 'default_code', 'x_studio_tipo_de_vehiculo', 'x_studio_status_vehiculo', 'x_studio_tipo_de_servicio', 'x_studio_color_vehiculo', 'categ_id'],
       order: 'default_code asc',
       limit: parseInt(req.query.limit) || 200,
     });
@@ -627,6 +627,7 @@ app.get('/vehiculos', async (req, res) => {
         tipo_vehiculo: v.x_studio_tipo_de_vehiculo || '',
         status: v.x_studio_status_vehiculo || '',
         tipo_servicio: v.x_studio_tipo_de_servicio || '',
+        color: v.x_studio_color_vehiculo || '',
         marca: parsed.marca,
         linea: parsed.linea,
         anio: parsed.anio,
@@ -652,7 +653,7 @@ app.get('/vehiculo/:placa', async (req, res) => {
     const vehiculos = await odooExecute(uid, 'product.template', 'search_read', [
       [['default_code', '=', placa]]
     ], {
-      fields: ['id', 'name', 'default_code', 'x_studio_tipo_de_vehiculo', 'x_studio_status_vehiculo'],
+      fields: ['id', 'name', 'default_code', 'x_studio_tipo_de_vehiculo', 'x_studio_status_vehiculo', 'x_studio_color_vehiculo'],
       limit: 1,
     });
 
@@ -707,6 +708,7 @@ app.get('/vehiculo/:placa', async (req, res) => {
         placa: vehiculo.default_code || '',
         tipo_vehiculo: vehiculo.x_studio_tipo_de_vehiculo || '',
         status: vehiculo.x_studio_status_vehiculo || '',
+        color: vehiculo.x_studio_color_vehiculo || '',
         marca: parsed.marca,
         linea: parsed.linea,
         anio: parsed.anio,

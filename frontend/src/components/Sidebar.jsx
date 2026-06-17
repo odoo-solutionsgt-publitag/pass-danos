@@ -11,6 +11,7 @@ import {
   LogOut,
   X,
   Users,
+  ClipboardList,
 } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
 
@@ -19,6 +20,7 @@ const NAV_PRINCIPAL = [
   { to: '/siniestros', label: 'Daños', icon: AlertTriangle },
   { to: '/servicios', label: 'Servicios', icon: Wrench },
   { to: '/proformas', label: 'Proformas', icon: FileText },
+  { to: '/pases-salida', label: 'Pase de Salida', icon: ClipboardList },
   { to: '/flota', label: 'Flota Vehicular', icon: Car },
 ]
 

@@ -63,6 +63,13 @@ CREATE TABLE public.siniestros (
   tiene_prefactura boolean DEFAULT false,
   tiene_proforma boolean DEFAULT false,
   tiene_factura boolean DEFAULT false,
+  reservacion_numero text,
+  cliente_direccion text,
+  ubicacion_vehiculo USER-DEFINED NOT NULL DEFAULT 'pass'::ubicacion_vehiculo,
+  ubicacion_detalle text,
+  estado_checking USER-DEFINED NOT NULL DEFAULT 'pre_diagnostico'::estado_checking_dano,
+  disponible_renta boolean NOT NULL DEFAULT false,
+  tipo_cotizacion text NOT NULL DEFAULT 'unica'::text CHECK (tipo_cotizacion = ANY (ARRAY['unica'::text, 'multiple'::text])),
   CONSTRAINT siniestros_pkey PRIMARY KEY (id),
   CONSTRAINT siniestros_taller_id_fkey FOREIGN KEY (taller_id) REFERENCES public.talleres(id),
   CONSTRAINT siniestros_registrado_por_fkey FOREIGN KEY (registrado_por) REFERENCES auth.users(id)

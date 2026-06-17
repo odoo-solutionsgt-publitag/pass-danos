@@ -17,6 +17,7 @@ import FechasTaller from '../components/FechasTaller'
 import HistorialCambios from '../components/HistorialCambios'
 import BitacoraActualizaciones from '../components/BitacoraActualizaciones'
 import InfoOperacional from '../components/InfoOperacional'
+import PaseSalidaSection from '../components/PaseSalidaSection'
 import { formatDate as fmtDate, formatDateTime as fmtDateTime } from '../lib/fecha'
 
 // ── Labels y colores ──────────────────────────────────────────
@@ -655,6 +656,22 @@ export default function SiniestroDetalle() {
           }}
           onUpdate={() => loadAll()}
         />
+
+        {/* ── Pase de Salida Interno ──────────────────────────── */}
+        {!['cerrado', 'anulado'].includes(estado) && (
+          <PaseSalidaSection
+            siniestro={{
+              id:                    siniestro.id,
+              numero:                siniestro.numero,
+              placa:                 siniestro.placa,
+              odoo_product_id:       siniestro.odoo_product_id,
+              vehiculo_tipo:         [siniestro.marca, siniestro.linea, siniestro.anio].filter(Boolean).join(' '),
+              vehiculo_color:        siniestro.vehiculo_color ?? '',
+              registrado_por_nombre: siniestro.registrado_por_nombre ?? '',
+            }}
+            userName={perfil?.nombre_completo}
+          />
+        )}
 
         {/*
           Cotizaciones (sección activa de gestión).

@@ -13,6 +13,7 @@ import ChecklistCierre from '../components/ChecklistCierre'
 import FechasTaller from '../components/FechasTaller'
 import HistorialCambios from '../components/HistorialCambios'
 import BitacoraActualizaciones from '../components/BitacoraActualizaciones'
+import PaseSalidaSection from '../components/PaseSalidaSection'
 import { formatDate as fmtDate, formatDateTime as fmtDateTime } from '../lib/fecha'
 
 // ── Constantes ────────────────────────────────────────────────
@@ -670,6 +671,22 @@ export default function ServicioDetalle() {
           }}
           onUpdate={() => loadAll()}
         />
+
+        {/* ── Pase de Salida Interno ──────────────────────────── */}
+        {!['completado', 'cancelado'].includes(estado) && (
+          <PaseSalidaSection
+            servicio={{
+              id:                    orden.id,
+              numero:                orden.numero,
+              placa:                 orden.placa,
+              odoo_product_id:       orden.odoo_product_id,
+              vehiculo_tipo:         orden.tipo_vehiculo ?? '',
+              vehiculo_color:        orden.vehiculo_color ?? '',
+              registrado_por_nombre: orden.registrado_por_nombre ?? '',
+            }}
+            userName={perfil?.nombre_completo}
+          />
+        )}
 
         {/* ── Checklist de cierre ─────────────────────────────── */}
         {['completado'].includes(estado) && (
