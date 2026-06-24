@@ -9,6 +9,34 @@ const TABS = [
   { key: 'repuestos', label: 'Repuestos', icon: Package },
 ]
 
+// ── Catálogo de marcas y líneas de la flota ──────────────────
+const MARCAS_LINEAS = {
+  Chevrolet:  ['Suburban', 'Tracker'],
+  Hyundai:    ['SANTA FE', 'Staria'],
+  Mazda:      ['CX5'],
+  Mitsubishi: ['L200', 'Montero'],
+  Toyota:     ['Agya', 'Corolla', 'HI ACE', 'HI LUX', 'Innova', 'Prado', 'Yaris'],
+}
+const MARCAS = Object.keys(MARCAS_LINEAS).sort()
+
+const CATEGORIAS = [
+  { value: 'repuesto',             label: 'Repuesto' },
+  { value: 'rayones_golpes_leves', label: 'Rayones y Golpes Leves' },
+  { value: 'otro',                 label: 'Otro' },
+]
+
+const CATEGORIA_COLORS = {
+  repuesto:             'bg-gray-100 text-gray-700',
+  rayones_golpes_leves: 'bg-amber-100 text-amber-700',
+  otro:                 'bg-blue-100 text-blue-700',
+}
+
+const CATEGORIA_LABELS = {
+  repuesto:             'Repuesto',
+  rayones_golpes_leves: 'Rayones / Golpes',
+  otro:                 'Otro',
+}
+
 export default function Catalogos() {
   const { puedeCrear, puedeEditar } = usePermisos()
   const [tab, setTab] = useState('talleres')
@@ -436,9 +464,12 @@ function RepuestosTab({ esAdmin }) {
               <tr className="bg-gray-50 border-b border-gray-100">
                 <th className="text-left px-5 py-3 text-xs text-gray-500 font-medium">Código</th>
                 <th className="text-left px-5 py-3 text-xs text-gray-500 font-medium">Repuesto</th>
+                <th className="text-left px-5 py-3 text-xs text-gray-500 font-medium">Categoría</th>
                 <th className="text-left px-5 py-3 text-xs text-gray-500 font-medium">Marca / Modelo</th>
                 <th className="text-left px-5 py-3 text-xs text-gray-500 font-medium">Años</th>
-                <th className="text-right px-5 py-3 text-xs text-gray-500 font-medium">Precio ref. Q</th>
+                <th className="text-right px-5 py-3 text-xs text-gray-500 font-medium">Lista Q</th>
+                <th className="text-right px-5 py-3 text-xs text-gray-500 font-medium">M.O. Q</th>
+                <th className="text-right px-5 py-3 text-xs text-gray-500 font-medium">Total Q</th>
                 <th className="text-left px-5 py-3 text-xs text-gray-500 font-medium">Vigencia</th>
                 {esAdmin && <th className="px-5 py-3 w-16" />}
               </tr>
@@ -447,7 +478,7 @@ function RepuestosTab({ esAdmin }) {
               {loading ? (
                 Array.from({ length: 5 }).map((_, i) => (
                   <tr key={i}>
-                    {Array.from({ length: esAdmin ? 7 : 6 }).map((_, j) => (
+                    {Array.from({ length: esAdmin ? 10 : 9 }).map((_, j) => (
                       <td key={j} className="px-5 py-3.5">
                         <div className="h-3.5 bg-gray-100 rounded animate-pulse w-20" />
                       </td>
@@ -456,23 +487,32 @@ function RepuestosTab({ esAdmin }) {
                 ))
               ) : filtrados.length === 0 ? (
                 <tr>
-                  <td colSpan={esAdmin ? 7 : 6} className="px-5 py-12 text-center text-gray-400">
+                  <td colSpan={esAdmin ? 10 : 9} className="px-5 py-12 text-center text-gray-400">
                     No hay repuestos registrados
                   </td>
                 </tr>
               ) : (
                 filtrados.map(r => {
                   const v = vigenciaRepuesto(r.precio_actualizado_at)
+                  const catColor = CATEGORIA_COLORS[r.categoria] ?? 'bg-gray-100 text-gray-600'
+                  const catLabel = CATEGORIA_LABELS[r.categoria] ?? r.categoria ?? '—'
                   return (
                     <tr key={r.id} className="hover:bg-gray-50">
                       <td className="px-5 py-3.5 font-mono text-xs text-gray-700 whitespace-nowrap">{r.codigo}</td>
                       <td className="px-5 py-3.5 font-medium text-gray-900">{r.nombre}</td>
+                      <td className="px-5 py-3.5">
+                        <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${catColor}`}>
+                          {catLabel}
+                        </span>
+                      </td>
                       <td className="px-5 py-3.5 text-gray-600">
                         {r.marca || '—'}
                         {r.linea_modelo && <span className="text-gray-400"> · {r.linea_modelo}</span>}
                       </td>
                       <td className="px-5 py-3.5 text-gray-600 text-xs">{r.anios || '—'}</td>
                       <td className="px-5 py-3.5 text-gray-700 text-right whitespace-nowrap">{formatMonto(r.precio_ref)}</td>
+                      <td className="px-5 py-3.5 text-gray-700 text-right whitespace-nowrap">{formatMonto(r.precio_mano_obra)}</td>
+                      <td className="px-5 py-3.5 font-medium text-gray-900 text-right whitespace-nowrap">{formatMonto(r.precio_total)}</td>
                       <td className="px-5 py-3.5">
                         <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${v.color}`}>
                           {v.label}
@@ -514,19 +554,33 @@ function RepuestosTab({ esAdmin }) {
 function RepuestoModal({ repuesto, onClose, onSaved }) {
   const esNuevo = !repuesto.id
   const [form, setForm] = useState({
-    codigo:       repuesto.codigo || '',
-    nombre:       repuesto.nombre || '',
-    marca:        repuesto.marca || '',
-    linea_modelo: repuesto.linea_modelo || '',
-    anios:        repuesto.anios || '',
-    precio_ref:   repuesto.precio_ref ?? '',
-    activo:       repuesto.activo ?? true,
+    codigo:           repuesto.codigo || '',
+    nombre:           repuesto.nombre || '',
+    categoria:        repuesto.categoria || 'repuesto',
+    marca:            repuesto.marca || '',
+    linea_modelo:     repuesto.linea_modelo || '',
+    anios:            repuesto.anios || '',
+    precio_ref:       repuesto.precio_ref ?? '',
+    precio_mano_obra: repuesto.precio_mano_obra ?? '',
+    activo:           repuesto.activo ?? true,
   })
   const [actualizarPrecio, setActualizarPrecio] = useState(esNuevo)
   const [saving, setSaving] = useState(false)
-  const [error, setError] = useState('')
+  const [error, setError]   = useState('')
 
   function setField(k, v) { setForm(f => ({ ...f, [k]: v })) }
+
+  function setMarca(v) {
+    setForm(f => ({ ...f, marca: v, linea_modelo: '' }))
+  }
+
+  const lineasDisponibles = MARCAS_LINEAS[form.marca] ?? []
+  const precioTotal = (Number(form.precio_ref) || 0) + (Number(form.precio_mano_obra) || 0)
+
+  function formatMonto(n) {
+    if (!n && n !== 0) return ''
+    return Number(n).toLocaleString('es-GT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  }
 
   async function guardar() {
     if (!form.codigo.trim() || !form.nombre.trim()) {
@@ -537,18 +591,19 @@ function RepuestoModal({ repuesto, onClose, onSaved }) {
     setError('')
     try {
       const payload = {
-        codigo:       form.codigo.trim().toUpperCase(),
-        nombre:       form.nombre.trim(),
-        marca:        form.marca.trim() || null,
-        linea_modelo: form.linea_modelo.trim() || null,
-        anios:        form.anios.trim() || null,
-        precio_ref:   form.precio_ref === '' ? 0 : Number(form.precio_ref),
-        activo:       form.activo,
+        codigo:           form.codigo.trim().toUpperCase(),
+        nombre:           form.nombre.trim(),
+        categoria:        form.categoria,
+        marca:            form.marca || null,
+        linea_modelo:     form.linea_modelo || null,
+        anios:            form.anios.trim() || null,
+        precio_ref:       form.precio_ref === '' ? 0 : Number(form.precio_ref),
+        precio_mano_obra: form.precio_mano_obra === '' ? 0 : Number(form.precio_mano_obra),
+        activo:           form.activo,
       }
       if (actualizarPrecio || esNuevo) {
         payload.precio_actualizado_at = new Date().toISOString()
       }
-
       if (esNuevo) {
         const { error } = await supabase.from('repuestos_catalogo').insert(payload)
         if (error) throw error
@@ -582,13 +637,14 @@ function RepuestoModal({ repuesto, onClose, onSaved }) {
             </div>
           )}
 
+          {/* Código + Nombre */}
           <div className="grid grid-cols-3 gap-3">
             <Field label="Código *">
               <input
                 type="text"
                 value={form.codigo}
                 onChange={e => setField('codigo', e.target.value.toUpperCase())}
-                placeholder="REP-001"
+                placeholder="AGYA-01"
                 className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-red-500 font-mono"
               />
             </Field>
@@ -602,50 +658,101 @@ function RepuestoModal({ repuesto, onClose, onSaved }) {
             </Field>
           </div>
 
+          {/* Categoría */}
+          <Field label="Categoría">
+            <select
+              value={form.categoria}
+              onChange={e => setField('categoria', e.target.value)}
+              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-red-500 text-gray-700"
+            >
+              {CATEGORIAS.map(c => (
+                <option key={c.value} value={c.value}>{c.label}</option>
+              ))}
+            </select>
+          </Field>
+
+          {/* Marca + Línea */}
           <div className="grid grid-cols-2 gap-3">
             <Field label="Marca">
-              <input
-                type="text"
+              <select
                 value={form.marca}
-                onChange={e => setField('marca', e.target.value)}
-                placeholder="Toyota"
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-red-500"
-              />
+                onChange={e => setMarca(e.target.value)}
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-red-500 text-gray-700"
+              >
+                <option value="">— Sin marca</option>
+                {MARCAS.map(m => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
+              </select>
             </Field>
             <Field label="Línea / Modelo">
-              <input
-                type="text"
-                value={form.linea_modelo}
-                onChange={e => setField('linea_modelo', e.target.value)}
-                placeholder="Yaris"
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-red-500"
-              />
+              {lineasDisponibles.length > 0 ? (
+                <select
+                  value={form.linea_modelo}
+                  onChange={e => setField('linea_modelo', e.target.value)}
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-red-500 text-gray-700"
+                >
+                  <option value="">— Sin línea</option>
+                  {lineasDisponibles.map(l => (
+                    <option key={l} value={l}>{l}</option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  type="text"
+                  value={form.linea_modelo}
+                  onChange={e => setField('linea_modelo', e.target.value)}
+                  placeholder="Modelo"
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-red-500"
+                />
+              )}
             </Field>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Años">
-              <input
-                type="text"
-                value={form.anios}
-                onChange={e => setField('anios', e.target.value)}
-                placeholder="2018-2023"
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-red-500"
-              />
-            </Field>
-            <Field label="Precio referencia Q">
+          {/* Años */}
+          <Field label="Años">
+            <input
+              type="text"
+              value={form.anios}
+              onChange={e => setField('anios', e.target.value)}
+              placeholder="2018-2023"
+              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-red-500"
+            />
+          </Field>
+
+          {/* 3 precios */}
+          <div className="grid grid-cols-3 gap-3">
+            <Field label="Precio Lista Q">
               <input
                 type="number"
                 step="0.01"
+                min="0"
                 value={form.precio_ref}
                 onChange={e => setField('precio_ref', e.target.value)}
                 className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-red-500 text-right"
               />
             </Field>
+            <Field label="Mano de Obra Q">
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={form.precio_mano_obra}
+                onChange={e => setField('precio_mano_obra', e.target.value)}
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-red-500 text-right"
+              />
+            </Field>
+            <Field label="Total Q">
+              <div className="w-full px-3 py-2 text-sm border border-gray-100 rounded-lg bg-gray-50 text-right text-gray-700 font-medium">
+                {formatMonto(precioTotal) || '0.00'}
+              </div>
+            </Field>
           </div>
+          <p className="text-xs text-gray-400 -mt-2">Total = Precio Lista + Mano de Obra (calculado automáticamente)</p>
 
+          {/* Marcar precio */}
           {!esNuevo && (
-            <label className="flex items-center gap-2 text-sm text-gray-700 bg-blue-50 border border-blue-200 px-3 py-2 rounded-lg">
+            <label className="flex items-center gap-2 text-sm text-gray-700 bg-blue-50 border border-blue-200 px-3 py-2 rounded-lg cursor-pointer">
               <input
                 type="checkbox"
                 checked={actualizarPrecio}
@@ -657,7 +764,8 @@ function RepuestoModal({ repuesto, onClose, onSaved }) {
             </label>
           )}
 
-          <label className="flex items-center gap-2 text-sm text-gray-700">
+          {/* Activo */}
+          <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
             <input
               type="checkbox"
               checked={form.activo}
