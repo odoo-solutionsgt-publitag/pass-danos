@@ -1,8 +1,8 @@
 # Plan: Nuevo Formulario de Repuestos — Catálogo
 
 **Fecha:** 2026-06-24
-**Estado:** Pendiente de implementación
-**Alcance:** Solo formulario de ingreso/edición manual (Fase 1). Importación masiva Excel = Fase 2 (pendiente).
+**Estado:** ✅ Fase 1 completada — en producción
+**Alcance:** Formulario de ingreso/edición manual + filtros de búsqueda. Importación masiva Excel = Fase 2 (pendiente).
 
 ---
 
@@ -177,6 +177,23 @@ Código | Repuesto | Categoría | Marca / Modelo | Años | Lista Q | M.O. Q | To
 | `CotizacionesSection.jsx` | Usa `precio_ref` al seleccionar repuesto | Ninguna — sigue usando `precio_ref` (Precio Lista) |
 | `repuestos_catalogo` RLS | Solo admin/agente_senior puede modificar | Sin cambio |
 | `precio_actualizado_at` | Se sigue marcando con el checkbox existente | Sin cambio |
+
+---
+
+## Filtros de búsqueda (implementado post-Fase 1)
+
+Solicitado tras validar el formulario en producción. Cambios solo en frontend, sin migración BD.
+
+**Nuevos filtros en la barra de `RepuestosTab`:**
+
+| Filtro | Comportamiento |
+|--------|---------------|
+| Categoría | Select: Todas / Repuesto / Rayones y Golpes Leves / Otro |
+| Marca | Select: Todas / Toyota / Hyundai / Chevrolet / Mitsubishi / Mazda |
+| Línea | Select dependiente de Marca — aparece solo si hay marca seleccionada; se resetea al cambiar marca |
+| Vigencia | Ya existía (Vigente / Revisar / Desactualizado / Sin precio) |
+
+Todos los filtros son client-side (los datos ya están cargados en memoria). Se combinan acumulativamente con la búsqueda de texto libre existente.
 
 ---
 

@@ -375,10 +375,20 @@ function vigenciaRepuesto(precio_actualizado_at) {
 function RepuestosTab({ esAdmin }) {
   const [items, setItems]     = useState([])
   const [loading, setLoading] = useState(true)
-  const [busqueda, setBusqueda] = useState('')
+  const [busqueda, setBusqueda]           = useState('')
+  const [filtroCategoria, setFiltroCategoria] = useState('')
+  const [filtroMarca, setFiltroMarca]     = useState('')
+  const [filtroLinea, setFiltroLinea]     = useState('')
   const [filtroVigencia, setFiltroVigencia] = useState('')
-  const [soloActivos, setSoloActivos] = useState(true)
-  const [editando, setEditando] = useState(null)
+  const [soloActivos, setSoloActivos]     = useState(true)
+  const [editando, setEditando]           = useState(null)
+
+  function setMarcaFiltro(v) {
+    setFiltroMarca(v)
+    setFiltroLinea('')   // resetear línea al cambiar marca
+  }
+
+  const lineasFiltro = MARCAS_LINEAS[filtroMarca] ?? []
 
   useEffect(() => { load() }, [])
 
@@ -394,6 +404,9 @@ function RepuestosTab({ esAdmin }) {
 
   const filtrados = items.filter(r => {
     if (soloActivos && !r.activo) return false
+    if (filtroCategoria && r.categoria !== filtroCategoria) return false
+    if (filtroMarca && r.marca !== filtroMarca) return false
+    if (filtroLinea && r.linea_modelo !== filtroLinea) return false
     if (filtroVigencia) {
       const v = vigenciaRepuesto(r.precio_actualizado_at)
       if (v.label !== filtroVigencia) return false
@@ -416,7 +429,8 @@ function RepuestosTab({ esAdmin }) {
   return (
     <div className="space-y-4">
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 flex flex-wrap gap-3 items-center">
-        <div className="flex-1 min-w-[200px] relative">
+        {/* Búsqueda */}
+        <div className="flex-1 min-w-[220px] relative">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
             type="text"
@@ -426,6 +440,46 @@ function RepuestosTab({ esAdmin }) {
             className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-red-500"
           />
         </div>
+
+        {/* Categoría */}
+        <select
+          value={filtroCategoria}
+          onChange={e => setFiltroCategoria(e.target.value)}
+          className="text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:border-red-500 text-gray-600"
+        >
+          <option value="">Todas las categorías</option>
+          {CATEGORIAS.map(c => (
+            <option key={c.value} value={c.value}>{c.label}</option>
+          ))}
+        </select>
+
+        {/* Marca */}
+        <select
+          value={filtroMarca}
+          onChange={e => setMarcaFiltro(e.target.value)}
+          className="text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:border-red-500 text-gray-600"
+        >
+          <option value="">Todas las marcas</option>
+          {MARCAS.map(m => (
+            <option key={m} value={m}>{m}</option>
+          ))}
+        </select>
+
+        {/* Línea — solo visible si hay marca seleccionada */}
+        {filtroMarca && lineasFiltro.length > 0 && (
+          <select
+            value={filtroLinea}
+            onChange={e => setFiltroLinea(e.target.value)}
+            className="text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:border-red-500 text-gray-600"
+          >
+            <option value="">Todas las líneas</option>
+            {lineasFiltro.map(l => (
+              <option key={l} value={l}>{l}</option>
+            ))}
+          </select>
+        )}
+
+        {/* Vigencia */}
         <select
           value={filtroVigencia}
           onChange={e => setFiltroVigencia(e.target.value)}
@@ -437,6 +491,8 @@ function RepuestosTab({ esAdmin }) {
           <option value="Desactualizado">Desactualizado</option>
           <option value="Sin precio">Sin precio</option>
         </select>
+
+        {/* Solo activos */}
         <label className="flex items-center gap-2 text-sm text-gray-600">
           <input
             type="checkbox"
@@ -446,6 +502,7 @@ function RepuestosTab({ esAdmin }) {
           />
           Solo activos
         </label>
+
         {esAdmin && (
           <button
             onClick={() => setEditando({})}
