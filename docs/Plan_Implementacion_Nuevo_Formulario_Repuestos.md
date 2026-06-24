@@ -22,7 +22,7 @@ Fuente de datos analizada: `docs/repuestos-agya.xlsx` y `docs/marcas-lineas.xlsx
 
 ### 1. Migración de base de datos
 
-Archivo: `db/009_repuestos_nuevos_campos.sql`
+Archivo: `db/011_repuestos_nuevos_campos.sql`
 
 ```sql
 -- Nuevas columnas de precio
@@ -217,11 +217,38 @@ Todos los filtros son client-side (los datos ya están cargados en memoria). Se 
 
 ## Orden de implementación (Fase 1)
 
-1. Ejecutar `db/009_repuestos_nuevos_campos.sql` en Supabase
-2. Actualizar `Catalogos.jsx`:
+1. ✅ Ejecutar `db/011_repuestos_nuevos_campos.sql` en Supabase
+2. ✅ Actualizar `Catalogos.jsx`:
    - Agregar constantes `MARCAS_LINEAS` y `CATEGORIAS`
    - Modificar `RepuestoModal` (state, layout, selects, precios)
    - Actualizar tabla en `RepuestosTab` (columnas nuevas, badge categoría)
-3. Commit + push → deploy frontend
+   - Agregar filtros Categoría / Marca / Línea / Vigencia en barra de búsqueda
+3. ✅ Commit + push → deploy frontend
 
 No requiere cambios en backend ni en ninguna otra página.
+
+---
+
+## Commits de referencia (rama main)
+
+| Hash | Descripción |
+|------|-------------|
+| `76aac12` | feat(catalogos): nuevo formulario de repuestos con selects y 3 precios |
+| `703bdb5` | feat(catalogos): filtros Categoría, Marca y Línea en tabla de repuestos |
+
+---
+
+## Sesión 2026-06-24 — Otros cambios implementados
+
+Además del formulario de repuestos, en la misma sesión se implementaron:
+
+### Permiso `ver_anulados` por usuario
+- Nuevo flag `ver_anulados` en el JSONB `perfiles.permisos`
+- Solo usuarios con ese flag ven daños anulados y servicios cancelados en: Lista Daños/Servicios, Dashboard, Reporte Diario, Bitácora, Flota, Proformas
+- Preset Admin lo activa por defecto; los demás en `false`
+- Columna nueva `👁‍🗨` visible en la tabla de Usuarios y permisos
+- Commit: `d9059e6`
+
+### PDF Pase de Salida actualizado
+- Subido `Pase-Salida-Contrato-Interno-Pass-2026.pdf` actualizado en `frontend/public/pdfs/`
+- Commit: `25c00b8`
