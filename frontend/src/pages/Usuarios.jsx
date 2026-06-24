@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Users, Shield, Eye, Pencil, Plus, Trash2, Search,
-  CheckCircle2, Circle, AlertTriangle, RefreshCw, Save, X,
+  CheckCircle2, Circle, AlertTriangle, RefreshCw, Save, X, EyeOff,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { usePermisos } from '../hooks/usePermisos'
@@ -21,28 +21,28 @@ const PRESETS = [
     key: 'solo_lectura',
     label: 'Solo lectura',
     description: 'Solo puede ver información',
-    permisos: { crear: false, editar: false, ver: true, eliminar: false },
+    permisos: { crear: false, editar: false, ver: true, eliminar: false, ver_anulados: false },
     rolSugerido: 'readonly',
   },
   {
     key: 'operacion',
     label: 'Operación',
     description: 'Puede crear y editar (uso diario)',
-    permisos: { crear: true, editar: true, ver: true, eliminar: false },
+    permisos: { crear: true, editar: true, ver: true, eliminar: false, ver_anulados: false },
     rolSugerido: 'agente',
   },
   {
     key: 'supervisor',
     label: 'Supervisor',
     description: 'Operación + eliminación',
-    permisos: { crear: true, editar: true, ver: true, eliminar: true },
+    permisos: { crear: true, editar: true, ver: true, eliminar: true, ver_anulados: false },
     rolSugerido: 'agente_senior',
   },
   {
     key: 'admin',
     label: 'Administrador',
     description: 'Todos los permisos',
-    permisos: { crear: true, editar: true, ver: true, eliminar: true },
+    permisos: { crear: true, editar: true, ver: true, eliminar: true, ver_anulados: true },
     rolSugerido: 'admin',
   },
 ]
@@ -180,6 +180,9 @@ export default function Usuarios() {
                 <th className="text-center px-3 py-3 text-xs text-gray-500 font-medium">
                   <span title="Eliminar"><Trash2 size={13} className="inline" /></span>
                 </th>
+                <th className="text-center px-3 py-3 text-xs text-gray-500 font-medium">
+                  <span title="Ver anulados/cancelados"><EyeOff size={13} className="inline" /></span>
+                </th>
                 <th className="text-center px-5 py-3 text-xs text-gray-500 font-medium">Activo</th>
                 <th className="text-left px-5 py-3 text-xs text-gray-500 font-medium">Creado</th>
                 <th className="px-5 py-3 w-16" />
@@ -189,7 +192,7 @@ export default function Usuarios() {
               {loading ? (
                 Array.from({ length: 4 }).map((_, i) => (
                   <tr key={i}>
-                    {Array.from({ length: 9 }).map((_, j) => (
+                    {Array.from({ length: 10 }).map((_, j) => (
                       <td key={j} className="px-5 py-3.5">
                         <div className="h-3.5 bg-gray-100 rounded animate-pulse w-16" />
                       </td>
@@ -198,7 +201,7 @@ export default function Usuarios() {
                 ))
               ) : filtrados.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-5 py-12 text-center text-gray-400">
+                  <td colSpan={10} className="px-5 py-12 text-center text-gray-400">
                     No se encontraron usuarios
                   </td>
                 </tr>
@@ -221,6 +224,7 @@ export default function Usuarios() {
                       <td className="px-3 py-3.5 text-center"><PermCheck v={perm.editar} /></td>
                       <td className="px-3 py-3.5 text-center"><PermCheck v={perm.ver} /></td>
                       <td className="px-3 py-3.5 text-center"><PermCheck v={perm.eliminar} danger /></td>
+                      <td className="px-3 py-3.5 text-center"><PermCheck v={perm.ver_anulados} /></td>
                       <td className="px-5 py-3.5 text-center">
                         {p.activo
                           ? <CheckCircle2 size={16} className="text-green-600 inline" />
@@ -272,7 +276,7 @@ function UsuarioModal({ perfil, onClose, onSaved }) {
   const [rol, setRol]           = useState(perfil.rol || 'readonly')
   const [activo, setActivo]     = useState(perfil.activo ?? true)
   const [permisos, setPermisos] = useState(perfil.permisos ?? {
-    crear: false, editar: false, ver: true, eliminar: false,
+    crear: false, editar: false, ver: true, eliminar: false, ver_anulados: false,
   })
   const [saving, setSaving] = useState(false)
   const [error, setError]   = useState('')
@@ -306,7 +310,8 @@ function UsuarioModal({ perfil, onClose, onSaved }) {
     p.permisos.crear === permisos.crear &&
     p.permisos.editar === permisos.editar &&
     p.permisos.ver === permisos.ver &&
-    p.permisos.eliminar === permisos.eliminar
+    p.permisos.eliminar === permisos.eliminar &&
+    p.permisos.ver_anulados === (permisos.ver_anulados ?? false)
   )
 
   return (
@@ -375,6 +380,11 @@ function UsuarioModal({ perfil, onClose, onSaved }) {
                 checked={permisos.eliminar}
                 onChange={() => togglePermiso('eliminar')}
                 danger
+              />
+              <PermisoRow
+                icon={EyeOff} label="Ver anulados/cancelados" description="Ver daños anulados y servicios cancelados en listas y reportes"
+                checked={!!permisos.ver_anulados}
+                onChange={() => togglePermiso('ver_anulados')}
               />
             </div>
           </div>

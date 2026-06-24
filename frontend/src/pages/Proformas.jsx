@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Search, FileText, Printer, Download } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { formatDate as fmtDateLib } from '../lib/fecha'
+import { usePermisos } from '../hooks/usePermisos'
 
 const ESTADO_SINIESTRO_LABELS = {
   proforma_emitida:  'Proforma emitida',
@@ -24,17 +25,18 @@ const ESTADO_SINIESTRO_COLORS = {
 
 export default function Proformas() {
   const navigate = useNavigate()
+  const { puedeVerAnulados } = usePermisos()
 
   const [proformas, setProformas] = useState([])
   const [loading, setLoading]     = useState(true)
   const [busqueda, setBusqueda]   = useState('')
   const [filtroEstado, setFiltroEstado] = useState('')
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [puedeVerAnulados])
 
   async function load() {
     setLoading(true)
-    const { data } = await supabase
+    let q = supabase
       .from('cotizaciones')
       .select(`
         id, total_general, fecha_recepcion,
@@ -46,9 +48,8 @@ export default function Proformas() {
         )
       `)
       .eq('estado', 'aprobada')
-      .neq('siniestros.estado', 'anulado')
-      .order('created_at', { ascending: false })
-      .limit(300)
+    if (!puedeVerAnulados) q = q.neq('siniestros.estado', 'anulado')
+    const { data } = await q.order('created_at', { ascending: false }).limit(300)
     setProformas(data ?? [])
     setLoading(false)
   }

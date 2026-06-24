@@ -277,7 +277,7 @@ export default function FlotaVehicular() {
 
 function VehiculoDrawer({ vehiculo, onClose }) {
   const navigate = useNavigate()
-  const { puedeCrear } = usePermisos()
+  const { puedeCrear, puedeVerAnulados } = usePermisos()
   const [detalle, setDetalle]     = useState(null)
   const [siniestros, setSinies]   = useState([])
   const [servicios, setServicios] = useState([])
@@ -295,11 +295,11 @@ function VehiculoDrawer({ vehiculo, onClose }) {
       try {
         const [detalleRes, sinRes, srvRes, pasesRes] = await Promise.all([
           fetchVehiculo(vehiculo.placa).catch(err => ({ _err: err.message })),
-          siniestrosQuery('id,numero,fecha_dano,tipo_dano,severidad,estado,total_general:costo_pass')
+          siniestrosQuery('id,numero,fecha_dano,tipo_dano,severidad,estado,total_general:costo_pass', { verAnulados: puedeVerAnulados })
             .eq('placa', vehiculo.placa)
             .order('created_at', { ascending: false })
             .limit(10),
-          ordenesServicioQuery('id,numero,fecha_programada,tipo_servicio,estado,total_general')
+          ordenesServicioQuery('id,numero,fecha_programada,tipo_servicio,estado,total_general', { verAnulados: puedeVerAnulados })
             .eq('placa', vehiculo.placa)
             .order('created_at', { ascending: false })
             .limit(10),
@@ -325,7 +325,7 @@ function VehiculoDrawer({ vehiculo, onClose }) {
     }
     load()
     return () => { cancel = true }
-  }, [vehiculo?.placa])
+  }, [vehiculo?.placa, puedeVerAnulados])
 
   const colors = STATUS_COLORS[vehiculo.status] ?? STATUS_FALLBACK
   const contrato = detalle?.contrato

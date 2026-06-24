@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase'
 import { formatDate as fmtDateLib } from '../lib/fecha'
 import { CHECKING_LABELS, CHECKING_COLORS } from './InfoOperacional'
 import { exportarReporteExcel } from '../lib/exportarReporteExcel'
+import { usePermisos } from '../hooks/usePermisos'
 
 const TIPO_DANO_LABELS = {
   choque_frontal: 'Choque frontal',
@@ -104,6 +105,7 @@ function rangoFecha({ year, month }) {
 
 export default function ReporteDiario() {
   const navigate = useNavigate()
+  const { puedeVerAnulados } = usePermisos()
   const aniosDisponibles = useMemo(() => listarAniosDisponibles(), [])
   const [anio, setAnio]               = useState(aniosDisponibles[0])
   const [mes, setMes]                 = useState(null)  // null = Todos los meses del año
@@ -115,7 +117,7 @@ export default function ReporteDiario() {
   const [filas, setFilas]             = useState([])
   const [loading, setLoading]         = useState(true)
 
-  useEffect(() => { load() }, [anio, mes])
+  useEffect(() => { load() }, [anio, mes, puedeVerAnulados])
 
   async function load() {
     setLoading(true)
@@ -131,9 +133,12 @@ export default function ReporteDiario() {
         cotizaciones(estado, total_general),
         talleres(nombre)
       `)
-      .not('estado', 'in', '("cerrado","anulado")')
-      .eq('disponible_renta', false)
-      .order('fecha_dano')
+    if (puedeVerAnulados) {
+      danosQ = danosQ.neq('estado', 'cerrado')
+    } else {
+      danosQ = danosQ.not('estado', 'in', '("cerrado","anulado")').eq('disponible_renta', false)
+    }
+    danosQ = danosQ.order('fecha_dano')
 
     // ── Servicios activos (no completados/cancelados) ──
     let serviciosQ = supabase
@@ -143,8 +148,12 @@ export default function ReporteDiario() {
         fecha_programada, fecha_estimada_entrega, estado, taller_id,
         talleres(nombre)
       `)
-      .not('estado', 'in', '("completado","cancelado")')
-      .order('fecha_programada')
+    if (puedeVerAnulados) {
+      serviciosQ = serviciosQ.neq('estado', 'completado')
+    } else {
+      serviciosQ = serviciosQ.not('estado', 'in', '("completado","cancelado")')
+    }
+    serviciosQ = serviciosQ.order('fecha_programada')
 
     // Filtro de fecha: año (siempre) + mes (opcional)
     const { inicio, fin } = rangoFecha({ year: anio, month: mes })

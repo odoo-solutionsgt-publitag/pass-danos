@@ -67,7 +67,7 @@ function formatDate(iso) {
 export default function BitacoraVehiculo() {
   const { placa } = useParams()
   const navigate = useNavigate()
-  const { puedeCrear } = usePermisos()
+  const { puedeCrear, puedeVerAnulados } = usePermisos()
 
   const [odooData, setOdooData] = useState(null)
   const [siniestros, setSinies] = useState([])
@@ -77,7 +77,7 @@ export default function BitacoraVehiculo() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
-  useEffect(() => { loadAll() }, [placa])
+  useEffect(() => { loadAll() }, [placa, puedeVerAnulados])
 
   async function loadAll() {
     if (!placa) return
@@ -87,10 +87,10 @@ export default function BitacoraVehiculo() {
       const placaUp = placa.toUpperCase()
       const [odooRes, sinRes, srvRes, pasesRes] = await Promise.all([
         fetchVehiculo(placaUp).catch(err => ({ _err: err.message })),
-        siniestrosQuery('id, numero, fecha_dano, tipo_dano, severidad, estado, descripcion, monto_cliente, costo_pass, margen, lugar_accidente')
+        siniestrosQuery('id, numero, fecha_dano, tipo_dano, severidad, estado, descripcion, monto_cliente, costo_pass, margen, lugar_accidente', { verAnulados: puedeVerAnulados })
           .eq('placa', placaUp)
           .order('created_at', { ascending: false }),
-        ordenesServicioQuery('id, numero, fecha_programada, tipo_servicio, estado, total_general, kilometraje, descripcion, talleres(nombre)')
+        ordenesServicioQuery('id, numero, fecha_programada, tipo_servicio, estado, total_general, kilometraje, descripcion, talleres(nombre)', { verAnulados: puedeVerAnulados })
           .eq('placa', placaUp)
           .order('created_at', { ascending: false }),
         supabase

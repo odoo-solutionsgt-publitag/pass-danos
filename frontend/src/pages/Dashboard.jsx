@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { AlertTriangle, FileText, Wrench, Car, Clock } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { siniestrosQuery } from '../lib/queries'
+import { usePermisos } from '../hooks/usePermisos'
 import ReporteDiario from '../components/ReporteDiario'
 import { formatDate as fmtDateLib, formatDateTime as fmtDateTimeLib } from '../lib/fecha'
 
@@ -48,6 +49,7 @@ function KpiCard({ title, value, icon: Icon, color, loading }) {
 
 export default function Dashboard() {
   const navigate = useNavigate()
+  const { puedeVerAnulados } = usePermisos()
   const [kpis, setKpis] = useState({ activos: 0, proformasPendientes: 0, enReparacion: 0, serviciosEnCurso: 0 })
   const [siniestros, setSiniestros] = useState([])
   const [actividad, setActividad] = useState([])
@@ -55,7 +57,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     loadDashboard()
-  }, [])
+  }, [puedeVerAnulados])
 
   async function loadDashboard() {
     try {
@@ -76,7 +78,7 @@ export default function Dashboard() {
           .is('fecha_egreso', null),
         supabase.from('ordenes_servicio').select('*', { count: 'exact', head: true })
           .eq('estado', 'en_proceso'),
-        siniestrosQuery('id,numero,placa,cliente_nombre,tipo_dano,severidad,estado,created_at')
+        siniestrosQuery('id,numero,placa,cliente_nombre,tipo_dano,severidad,estado,created_at', { verAnulados: puedeVerAnulados })
           .order('created_at', { ascending: false }).limit(5),
         supabase.from('siniestro_timeline').select('id,accion,detalle,created_at,siniestros(numero,placa)')
           .order('created_at', { ascending: false }).limit(10),

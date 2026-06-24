@@ -55,17 +55,17 @@ const ESTADO_LABELS = {
 
 export default function Servicios() {
   const navigate = useNavigate()
-  const { puedeCrear } = usePermisos()
+  const { puedeCrear, puedeVerAnulados } = usePermisos()
   const [ordenes, setOrdenes] = useState([])
   const [loading, setLoading] = useState(true)
   const [busqueda, setBusqueda] = useState('')
   const [filtroEstado, setFiltroEstado] = useState('')
 
-  useEffect(() => { loadOrdenes() }, [filtroEstado])
+  useEffect(() => { loadOrdenes() }, [filtroEstado, puedeVerAnulados])
 
   async function loadOrdenes() {
     setLoading(true)
-    let q = ordenesServicioQuery('id,numero,fecha_programada,placa,tipo_servicio,taller_id,talleres(nombre),total_general,estado')
+    let q = ordenesServicioQuery('id,numero,fecha_programada,placa,tipo_servicio,taller_id,talleres(nombre),total_general,estado', { verAnulados: puedeVerAnulados })
       .order('created_at', { ascending: false })
       .limit(200)
 
@@ -129,6 +129,7 @@ export default function Servicios() {
           <option value="aprobado">Aprobado</option>
           <option value="en_proceso">En proceso</option>
           <option value="completado">Completado</option>
+          {puedeVerAnulados && <option value="cancelado">Cancelado</option>}
         </select>
       </div>
 

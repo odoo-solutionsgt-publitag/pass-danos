@@ -1,6 +1,6 @@
 import { useAuth } from './useAuth'
 
-const PERMISOS_DEFAULT = { crear: false, editar: false, ver: true, eliminar: false }
+const PERMISOS_DEFAULT = { crear: false, editar: false, ver: true, eliminar: false, ver_anulados: false }
 
 /**
  * Hook centralizado para leer permisos del usuario actual.
@@ -15,13 +15,14 @@ export function usePermisos() {
   const p = perfil?.permisos ?? PERMISOS_DEFAULT
 
   return {
-    puedeCrear:    !!p.crear,
-    puedeEditar:   !!p.editar,
-    puedeVer:      p.ver !== false,    // ver es true por default
-    puedeEliminar: !!p.eliminar,
-    esAdmin:       perfil?.rol === 'admin',
-    esAdminOSenior: perfil?.rol === 'admin' || perfil?.rol === 'agente_senior',
-    rol:           perfil?.rol ?? 'readonly',
+    puedeCrear:       !!p.crear,
+    puedeEditar:      !!p.editar,
+    puedeVer:         p.ver !== false,    // ver es true por default
+    puedeEliminar:    !!p.eliminar,
+    puedeVerAnulados: !!p.ver_anulados,
+    esAdmin:          perfil?.rol === 'admin',
+    esAdminOSenior:   perfil?.rol === 'admin' || perfil?.rol === 'agente_senior',
+    rol:              perfil?.rol ?? 'readonly',
     loading,
   }
 }

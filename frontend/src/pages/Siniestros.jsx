@@ -44,14 +44,14 @@ const ESTADO_OPTIONS = [
 
 export default function Siniestros() {
   const navigate = useNavigate()
-  const { puedeCrear } = usePermisos()
+  const { puedeCrear, puedeVerAnulados } = usePermisos()
   const [siniestros, setSiniestros] = useState([])
   const [loading, setLoading] = useState(true)
   const [busqueda, setBusqueda] = useState('')
   const [filtroEstado, setFiltroEstado] = useState('')
   const [filtroSeveridad, setFiltroSeveridad] = useState('')
 
-  useEffect(() => { loadSiniestros() }, [filtroEstado, filtroSeveridad])
+  useEffect(() => { loadSiniestros() }, [filtroEstado, filtroSeveridad, puedeVerAnulados])
 
   async function loadSiniestros() {
     setLoading(true)
@@ -59,7 +59,7 @@ export default function Siniestros() {
       id, numero, fecha_dano, placa, cliente_nombre, tipo_dano, severidad,
       estado, estado_checking, tipo_cotizacion, created_at,
       cotizaciones(estado, total_general)
-    `)
+    `, { verAnulados: puedeVerAnulados })
       .order('created_at', { ascending: false })
       .limit(200)
 
@@ -159,6 +159,7 @@ export default function Siniestros() {
           {ESTADO_OPTIONS.map(e => (
             <option key={e} value={e}>{ESTADO_LABELS[e]}</option>
           ))}
+          {puedeVerAnulados && <option value="anulado">Anulado</option>}
         </select>
         <select
           value={filtroSeveridad}
