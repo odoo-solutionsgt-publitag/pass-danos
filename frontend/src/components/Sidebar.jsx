@@ -1,4 +1,4 @@
-import { NavLink, useNavigate } from 'react-router-dom'
+import { NavLink, useNavigate, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard,
   AlertTriangle,
@@ -12,6 +12,7 @@ import {
   X,
   Users,
   ClipboardList,
+  Package,
 } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
 
@@ -24,8 +25,7 @@ const NAV_PRINCIPAL = [
   { to: '/flota', label: 'Flota Vehicular', icon: Car },
 ]
 
-const NAV_CONFIG = [
-  { to: '/catalogos', label: 'Catálogos', icon: BookOpen },
+const NAV_CONFIG_BEFORE = [
   { to: '/repositorio', label: 'Repositorio', icon: FolderOpen },
   { to: '/reportes', label: 'Reportes', icon: BarChart3 },
 ]
@@ -50,6 +50,45 @@ function NavItem({ to, label, icon: Icon, onClick }) {
       <Icon size={18} />
       {label}
     </NavLink>
+  )
+}
+
+function CatalogosNav({ onClose }) {
+  const location = useLocation()
+  const enCatalogos = location.pathname === '/catalogos'
+  const tabActual = new URLSearchParams(location.search).get('tab') || 'talleres'
+
+  const subItems = [
+    { tab: 'talleres', label: 'Talleres', icon: Wrench },
+    { tab: 'repuestos', label: 'Repuestos', icon: Package },
+  ]
+
+  return (
+    <div>
+      {/* Catálogos — padre no clickable, solo visual */}
+      <div className="flex items-center gap-3 px-3 py-2 text-gray-400 text-sm font-medium">
+        <BookOpen size={18} />
+        Catálogos
+      </div>
+      {subItems.map(({ tab, label, icon: Icon }) => {
+        const active = enCatalogos && tabActual === tab
+        return (
+          <NavLink
+            key={tab}
+            to={`/catalogos?tab=${tab}`}
+            onClick={onClose}
+            className={`flex items-center gap-3 pl-9 pr-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+              active
+                ? 'bg-red-600 text-white'
+                : 'text-gray-300 hover:bg-gray-700 hover:text-white'
+            }`}
+          >
+            <Icon size={16} />
+            {label}
+          </NavLink>
+        )
+      })}
+    </div>
   )
 }
 
@@ -103,7 +142,8 @@ export default function Sidebar({ open, onClose }) {
 
           <p className="text-gray-500 text-xs font-semibold uppercase tracking-wider px-3 mb-2">Configuración</p>
           <div className="space-y-1 mb-6">
-            {NAV_CONFIG.map(item => (
+            <CatalogosNav onClose={onClose} />
+            {NAV_CONFIG_BEFORE.map(item => (
               <NavItem key={item.to} {...item} onClick={onClose} />
             ))}
           </div>

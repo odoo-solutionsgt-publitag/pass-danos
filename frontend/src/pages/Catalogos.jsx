@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Plus, Search, Pencil, X, Save, Wrench, Package, AlertCircle, CheckCircle2, Upload, Ban } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { usePermisos } from '../hooks/usePermisos'
@@ -39,7 +40,16 @@ const CATEGORIA_LABELS = {
 
 export default function Catalogos() {
   const { puedeCrear, puedeEditar, puedeVerAnulados } = usePermisos()
-  const [tab, setTab] = useState('talleres')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [tab, setTab] = useState(() => {
+    const t = searchParams.get('tab')
+    return t === 'repuestos' ? 'repuestos' : 'talleres'
+  })
+
+  function cambiarTab(nuevoTab) {
+    setTab(nuevoTab)
+    setSearchParams({ tab: nuevoTab }, { replace: true })
+  }
 
   const esAdmin = puedeCrear || puedeEditar
 
@@ -59,7 +69,7 @@ export default function Catalogos() {
           return (
             <button
               key={t.key}
-              onClick={() => setTab(t.key)}
+              onClick={() => cambiarTab(t.key)}
               className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
                 tab === t.key
                   ? 'border-red-600 text-red-600'
@@ -969,12 +979,20 @@ function normalizarNombreRepuesto(s) {
 // ============================================================
 
 function ImportarRepuestosModal({ onClose, onSuccess }) {
-  const [marca, setMarca]         = useState('')
+  const [marca, setMarcaState]    = useState('')
+  const [linea, setLinea]         = useState('')
   const [filas, setFilas]         = useState(null)
   const [parseando, setParseando] = useState(false)
   const [guardando, setGuardando] = useState(false)
   const [resultado, setResultado] = useState(null)
   const [error, setError]         = useState('')
+
+  const lineasDisp = MARCAS_LINEAS[marca] ?? []
+
+  function setMarca(v) {
+    setMarcaState(v)
+    setLinea('')  // resetear línea al cambiar marca
+  }
 
   const filasValidas  = filas?.filter(f => f._errores.length === 0) ?? []
   const filasConError = filas?.filter(f => f._errores.length > 0) ?? []
@@ -998,13 +1016,13 @@ function ImportarRepuestosModal({ onClose, onSuccess }) {
       const colMap = {}
       ws.getRow(1).eachCell({ includeEmpty: false }, (cell, col) => {
         const h = cell.text?.toString().trim().toLowerCase()
-          .normalize('NFD').replace(/[̀-ͯ]/g, '')
-        if (/^no\.?$|^codigo/.test(h))             colMap.codigo         = col
-        else if (/modelo|linea/.test(h))            colMap.linea_modelo   = col
-        else if (/categor/.test(h))                 colMap.categoria      = col
-        else if (/articulo|nombre|repuesto/.test(h)) colMap.nombre        = col
-        else if (/lista|precio lista/.test(h))      colMap.precio_ref     = col
-        else if (/mano|m\.o/.test(h))               colMap.precio_mano_obra = col
+          .normalize('NFD').replace(/[̀-ͯ]/g, '') // quitar tildes/diacríticos
+        if (/^no\.?$|^codigo/.test(h))              colMap.codigo           = col
+        else if (/modelo|linea/.test(h))             colMap.linea_modelo     = col
+        else if (/categor/.test(h))                  colMap.categoria        = col
+        else if (/articulo|nombre|repuesto/.test(h)) colMap.nombre           = col
+        else if (/lista|precio lista/.test(h))       colMap.precio_ref       = col
+        else if (/mano|m\.o/.test(h))                colMap.precio_mano_obra = col
       })
 
       const getText = (row, col) =>
@@ -1064,7 +1082,7 @@ function ImportarRepuestosModal({ onClose, onSuccess }) {
         codigo:               f.codigo,
         nombre:               f.nombre,
         marca:                marca || null,
-        linea_modelo:         f.linea_modelo,
+        linea_modelo:         f.linea_modelo || linea || null,
         categoria:            f.categoria,
         anios:                null,
         precio_ref:           f.precio_ref,
@@ -1142,8 +1160,8 @@ function ImportarRepuestosModal({ onClose, onSuccess }) {
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-4">
-                <Field label="Marca (aplica a todas las filas del archivo)">
+              <div className="grid grid-cols-3 gap-3">
+                <Field label="Marca (todas las filas)">
                   <select
                     value={marca}
                     onChange={e => setMarca(e.target.value)}
@@ -1153,6 +1171,26 @@ function ImportarRepuestosModal({ onClose, onSuccess }) {
                     {MARCAS.map(m => <option key={m} value={m}>{m}</option>)}
                   </select>
                 </Field>
+                <Field label="Línea / Modelo (todas las filas)">
+                  {lineasDisp.length > 0 ? (
+                    <select
+                      value={linea}
+                      onChange={e => setLinea(e.target.value)}
+                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-red-500 text-gray-700"
+                    >
+                      <option value="">— Sin línea</option>
+                      {lineasDisp.map(l => <option key={l} value={l}>{l}</option>)}
+                    </select>
+                  ) : (
+                    <input
+                      type="text"
+                      value={linea}
+                      onChange={e => setLinea(e.target.value)}
+                      placeholder="Ej: Agya"
+                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-red-500"
+                    />
+                  )}
+                </Field>
                 <Field label="Archivo Excel">
                   <label className={`flex items-center gap-2 px-3 py-2 text-sm border border-dashed rounded-lg cursor-pointer transition-colors ${
                     parseando
@@ -1160,7 +1198,7 @@ function ImportarRepuestosModal({ onClose, onSuccess }) {
                       : 'border-gray-300 hover:border-green-500 hover:bg-green-50 text-gray-500'
                   }`}>
                     <Upload size={15} />
-                    {parseando ? 'Leyendo archivo...' : 'Seleccionar .xlsx'}
+                    {parseando ? 'Leyendo...' : 'Seleccionar .xlsx'}
                     <input
                       type="file"
                       accept=".xlsx,.xls"
@@ -1173,7 +1211,8 @@ function ImportarRepuestosModal({ onClose, onSuccess }) {
               </div>
 
               <p className="text-xs text-gray-400">
-                Columnas esperadas: <span className="font-mono">No. · Modelo (Línea) · Categoría · Artículo · Precio Lista · Mano de Obra</span>
+                Columnas mínimas requeridas: <span className="font-mono">No. · Artículo · Precio Lista · Mano de Obra</span>
+                {' · '}Marca y Línea se toman de los selectores si el archivo no las incluye.
               </p>
 
               {filas !== null && (
