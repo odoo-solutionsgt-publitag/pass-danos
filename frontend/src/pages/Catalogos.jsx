@@ -371,11 +371,42 @@ function RepuestosTab({ esAdmin, puedeVerAnulados }) {
   const [soloActivos, setSoloActivos]     = useState(true)
   const [editando, setEditando]           = useState(null)
   const [importando, setImportando]       = useState(false)
-  const [anulando, setAnulando]           = useState(null) // ID del repuesto pendiente de confirmar
+  const [anulando, setAnulando]           = useState(null)
+  const [pageSize, setPageSize]           = useState(25)
+  const [pagina, setPagina]               = useState(1)
+  const [seleccionados, setSeleccionados] = useState(new Set())
+  const [modoPresupuesto, setModoPresupuesto] = useState(false)
+
+  // Resetear página al cambiar filtros o tamaño de página
+  useEffect(() => { setPagina(1) }, [busqueda, filtroCategoria, filtroMarca, filtroLinea, filtroVigencia, pageSize])
 
   function setMarcaFiltro(v) {
     setFiltroMarca(v)
-    setFiltroLinea('')   // resetear línea al cambiar marca
+    setFiltroLinea('')
+  }
+
+  function toggleSeleccion(id) {
+    setSeleccionados(prev => {
+      const s = new Set(prev)
+      s.has(id) ? s.delete(id) : s.add(id)
+      return s
+    })
+  }
+
+  function toggleTodosVisibles(lista) {
+    const ids = lista.map(r => r.id)
+    const todosMarcados = ids.every(id => seleccionados.has(id))
+    setSeleccionados(prev => {
+      const s = new Set(prev)
+      if (todosMarcados) ids.forEach(id => s.delete(id))
+      else ids.forEach(id => s.add(id))
+      return s
+    })
+  }
+
+  function salirPresupuesto() {
+    setModoPresupuesto(false)
+    setSeleccionados(new Set())
   }
 
   const lineasFiltro = MARCAS_LINEAS[filtroMarca] ?? []
@@ -422,7 +453,27 @@ function RepuestosTab({ esAdmin, puedeVerAnulados }) {
              r.linea_modelo?.toLowerCase().includes(b)
     }
     return true
-  })
+  }).sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es'))
+
+  // Presupuesto: solo los seleccionados
+  const vistaActual = modoPresupuesto
+    ? filtrados.filter(r => seleccionados.has(r.id))
+    : filtrados
+
+  // Paginación
+  const totalRegistros = vistaActual.length
+  const paginados = (!modoPresupuesto && pageSize > 0)
+    ? vistaActual.slice((pagina - 1) * pageSize, pagina * pageSize)
+    : vistaActual
+  const totalPaginas = pageSize > 0 ? Math.ceil(totalRegistros / pageSize) : 1
+
+  // Totales de seleccionados
+  const itemsSel = items.filter(r => seleccionados.has(r.id))
+  const sumLista = itemsSel.reduce((s, r) => s + (Number(r.precio_ref) || 0), 0)
+  const sumMO    = itemsSel.reduce((s, r) => s + (Number(r.precio_mano_obra) || 0), 0)
+  const sumTotal = itemsSel.reduce((s, r) => s + (Number(r.precio_total) || 0), 0)
+
+  const nCols = esAdmin ? 11 : 10  // +1 por checkbox
 
   function formatMonto(v) {
     if (v == null || v === '') return '—'
@@ -431,6 +482,23 @@ function RepuestosTab({ esAdmin, puedeVerAnulados }) {
 
   return (
     <div className="space-y-4">
+      {/* Banner modo presupuesto */}
+      {modoPresupuesto && (
+        <div className="bg-blue-50 border border-blue-200 rounded-xl px-5 py-3 flex items-center justify-between">
+          <div>
+            <span className="font-semibold text-blue-800">Modo Presupuesto</span>
+            <span className="text-blue-600 text-sm ml-3">{seleccionados.size} repuesto{seleccionados.size !== 1 ? 's' : ''} seleccionado{seleccionados.size !== 1 ? 's' : ''}</span>
+          </div>
+          <button
+            onClick={salirPresupuesto}
+            className="flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-800 font-medium border border-blue-300 hover:border-blue-500 px-3 py-1.5 rounded-lg transition-colors"
+          >
+            <X size={14} />
+            Salir
+          </button>
+        </div>
+      )}
+
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 flex flex-wrap gap-3 items-center">
         {/* Búsqueda */}
         <div className="flex-1 min-w-[220px] relative">
@@ -524,6 +592,37 @@ function RepuestosTab({ esAdmin, puedeVerAnulados }) {
           </button>
         )}
 
+        {/* Separador flex */}
+        <div className="flex-1" />
+
+        {/* Mostrar por página */}
+        <div className="flex items-center gap-2 text-sm text-gray-500">
+          <span className="hidden sm:inline">Mostrar</span>
+          {[10, 25, 50, 0].map(n => (
+            <button
+              key={n}
+              onClick={() => setPageSize(n)}
+              className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
+                pageSize === n
+                  ? 'bg-gray-800 text-white'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              {n === 0 ? 'Todos' : n}
+            </button>
+          ))}
+        </div>
+
+        {/* Botón Presupuesto — visible cuando hay seleccionados */}
+        {seleccionados.size > 0 && !modoPresupuesto && (
+          <button
+            onClick={() => setModoPresupuesto(true)}
+            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg"
+          >
+            Presupuesto ({seleccionados.size})
+          </button>
+        )}
+
         {esAdmin && (
           <div className="flex gap-2">
             <button
@@ -549,6 +648,15 @@ function RepuestosTab({ esAdmin, puedeVerAnulados }) {
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-100">
+                <th className="px-3 py-3 w-9">
+                  <input
+                    type="checkbox"
+                    checked={paginados.length > 0 && paginados.every(r => seleccionados.has(r.id))}
+                    onChange={() => toggleTodosVisibles(paginados)}
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    title="Seleccionar todos visibles"
+                  />
+                </th>
                 <th className="text-left px-5 py-3 text-xs text-gray-500 font-medium">Código</th>
                 <th className="text-left px-5 py-3 text-xs text-gray-500 font-medium">Repuesto</th>
                 <th className="text-left px-5 py-3 text-xs text-gray-500 font-medium">Categoría</th>
@@ -565,26 +673,35 @@ function RepuestosTab({ esAdmin, puedeVerAnulados }) {
               {loading ? (
                 Array.from({ length: 5 }).map((_, i) => (
                   <tr key={i}>
-                    {Array.from({ length: esAdmin ? 10 : 9 }).map((_, j) => (
+                    {Array.from({ length: nCols }).map((_, j) => (
                       <td key={j} className="px-5 py-3.5">
                         <div className="h-3.5 bg-gray-100 rounded animate-pulse w-20" />
                       </td>
                     ))}
                   </tr>
                 ))
-              ) : filtrados.length === 0 ? (
+              ) : paginados.length === 0 ? (
                 <tr>
-                  <td colSpan={esAdmin ? 10 : 9} className="px-5 py-12 text-center text-gray-400">
-                    No hay repuestos registrados
+                  <td colSpan={nCols} className="px-5 py-12 text-center text-gray-400">
+                    {modoPresupuesto ? 'No hay repuestos seleccionados' : 'No hay repuestos registrados'}
                   </td>
                 </tr>
               ) : (
-                filtrados.map(r => {
+                paginados.map(r => {
                   const v = vigenciaRepuesto(r.precio_actualizado_at)
                   const catColor = CATEGORIA_COLORS[r.categoria] ?? 'bg-gray-100 text-gray-600'
                   const catLabel = CATEGORIA_LABELS[r.categoria] ?? r.categoria ?? '—'
+                  const marcado = seleccionados.has(r.id)
                   return (
-                    <tr key={r.id} className="hover:bg-gray-50">
+                    <tr key={r.id} className={`hover:bg-gray-50 ${marcado ? 'bg-blue-50' : ''}`}>
+                      <td className="px-3 py-3.5">
+                        <input
+                          type="checkbox"
+                          checked={marcado}
+                          onChange={() => toggleSeleccion(r.id)}
+                          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        />
+                      </td>
                       <td className="px-5 py-3.5 font-mono text-xs text-gray-700 whitespace-nowrap">{r.codigo}</td>
                       <td className="px-5 py-3.5 font-medium text-gray-900">{r.nombre}</td>
                       <td className="px-5 py-3.5">
@@ -652,9 +769,72 @@ function RepuestosTab({ esAdmin, puedeVerAnulados }) {
                   )
                 })
               )}
+
+              {/* Fila de totales en modo presupuesto */}
+              {modoPresupuesto && paginados.length > 0 && (
+                <tr className="bg-blue-100 border-t-2 border-blue-300 font-semibold">
+                  <td className="px-3 py-3" />
+                  <td colSpan={5} className="px-5 py-3 text-blue-900 text-sm">
+                    TOTAL — {seleccionados.size} repuesto{seleccionados.size !== 1 ? 's' : ''}
+                  </td>
+                  <td className="px-5 py-3 text-right text-blue-900 whitespace-nowrap">
+                    Q {sumLista.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
+                  </td>
+                  <td className="px-5 py-3 text-right text-blue-900 whitespace-nowrap">
+                    Q {sumMO.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
+                  </td>
+                  <td className="px-5 py-3 text-right text-blue-900 text-base whitespace-nowrap">
+                    Q {sumTotal.toLocaleString('es-GT', { minimumFractionDigits: 2 })}
+                  </td>
+                  <td colSpan={esAdmin ? 2 : 1} />
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
+
+        {/* Pie de paginación */}
+        {!modoPresupuesto && totalRegistros > 0 && (
+          <div className="px-5 py-3 border-t border-gray-100 flex items-center justify-between text-sm text-gray-500">
+            <span>
+              {pageSize === 0
+                ? `${totalRegistros} registros`
+                : `${Math.min((pagina - 1) * pageSize + 1, totalRegistros)}–${Math.min(pagina * pageSize, totalRegistros)} de ${totalRegistros}`
+              }
+            </span>
+            {pageSize > 0 && totalPaginas > 1 && (
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setPagina(p => Math.max(1, p - 1))}
+                  disabled={pagina === 1}
+                  className="px-2 py-1 rounded text-xs disabled:opacity-40 hover:bg-gray-100"
+                >
+                  ‹ Ant.
+                </button>
+                {Array.from({ length: Math.min(totalPaginas, 7) }, (_, i) => {
+                  const n = totalPaginas <= 7 ? i + 1
+                    : pagina <= 4 ? i + 1
+                    : pagina >= totalPaginas - 3 ? totalPaginas - 6 + i
+                    : pagina - 3 + i
+                  return (
+                    <button key={n} onClick={() => setPagina(n)}
+                      className={`px-2 py-1 rounded text-xs font-medium transition-colors ${pagina === n ? 'bg-gray-800 text-white' : 'hover:bg-gray-100'}`}
+                    >
+                      {n}
+                    </button>
+                  )
+                })}
+                <button
+                  onClick={() => setPagina(p => Math.min(totalPaginas, p + 1))}
+                  disabled={pagina === totalPaginas}
+                  className="px-2 py-1 rounded text-xs disabled:opacity-40 hover:bg-gray-100"
+                >
+                  Sig. ›
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {editando && (
