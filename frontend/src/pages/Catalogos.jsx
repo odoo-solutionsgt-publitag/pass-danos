@@ -5,10 +5,6 @@ import { supabase } from '../lib/supabase'
 import { usePermisos } from '../hooks/usePermisos'
 import TallerContactosEditor from '../components/TallerContactosEditor'
 
-const TABS = [
-  { key: 'talleres', label: 'Talleres', icon: Wrench },
-  { key: 'repuestos', label: 'Repuestos', icon: Package },
-]
 
 // ── Catálogo de marcas y líneas de la flota ──────────────────
 const MARCAS_LINEAS = {
@@ -38,49 +34,31 @@ const CATEGORIA_LABELS = {
   otro:                 'Otro',
 }
 
+const SECCION_INFO = {
+  talleres:  { titulo: 'Talleres',  subtitulo: 'Proveedores de servicio automotriz', icon: Wrench },
+  repuestos: { titulo: 'Repuestos', subtitulo: 'Catálogo de repuestos y mano de obra', icon: Package },
+}
+
 export default function Catalogos() {
   const { puedeCrear, puedeEditar, puedeVerAnulados } = usePermisos()
-  const [searchParams, setSearchParams] = useSearchParams()
-  const [tab, setTab] = useState(() => {
-    const t = searchParams.get('tab')
-    return t === 'repuestos' ? 'repuestos' : 'talleres'
-  })
+  const [searchParams] = useSearchParams()
 
-  function cambiarTab(nuevoTab) {
-    setTab(nuevoTab)
-    setSearchParams({ tab: nuevoTab }, { replace: true })
-  }
+  // Tab derivado directamente de la URL — reactivo a cambios del sidebar
+  const tab = searchParams.get('tab') === 'repuestos' ? 'repuestos' : 'talleres'
+  const { titulo, subtitulo, icon: SeccionIcon } = SECCION_INFO[tab]
 
   const esAdmin = puedeCrear || puedeEditar
 
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="text-xl font-bold text-gray-900">Catálogos</h1>
-        <p className="text-sm text-gray-500">
-          Mantenimiento de proveedores y repuestos
-          {!esAdmin && ' · Solo lectura'}
-        </p>
-      </div>
-
-      <div className="border-b border-gray-200 flex gap-1">
-        {TABS.map(t => {
-          const Icon = t.icon
-          return (
-            <button
-              key={t.key}
-              onClick={() => cambiarTab(t.key)}
-              className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
-                tab === t.key
-                  ? 'border-red-600 text-red-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              <Icon size={15} />
-              {t.label}
-            </button>
-          )
-        })}
+      <div className="flex items-center gap-3">
+        <SeccionIcon size={22} className="text-gray-400 shrink-0" />
+        <div>
+          <h1 className="text-xl font-bold text-gray-900">{titulo}</h1>
+          <p className="text-sm text-gray-500">
+            {subtitulo}{!esAdmin && ' · Solo lectura'}
+          </p>
+        </div>
       </div>
 
       {tab === 'talleres' && <TalleresTab esAdmin={esAdmin} />}
