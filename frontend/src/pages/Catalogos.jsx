@@ -913,6 +913,58 @@ function RepuestoModal({ repuesto, onClose, onSaved }) {
 }
 
 // ============================================================
+// NORMALIZACIÓN DE NOMBRES DE REPUESTOS
+// ============================================================
+
+function normalizarNombreRepuesto(s) {
+  if (!s) return s
+
+  // ── 1. Correcciones ortográficas ─────────────────────────────
+  const CORRECCIONES = [
+    [/\bBompers?\b/gi,    m => m.toLowerCase().includes('s') ? 'Bumpers' : 'Bumper'],
+    [/\bAlineacion\b/gi,  'Alineación'],
+    [/\bPerciana\b/gi,    'Persiana'],
+    [/\bRajilla\b/gi,     'Rejilla'],
+    [/\bRegilla\b/gi,     'Rejilla'],
+    [/\bMagnecio\b/gi,    'Magnesio'],
+    [/\bTapiceria\b/gi,   'Tapicería'],
+    [/\bBateria\b/gi,     'Batería'],
+    [/\bTricket\b/gi,     'Trinquete'],
+    [/\bCapo\b/gi,        'Capó'],
+    [/\bFaldon\b/gi,      'Faldón'],
+    [/\bMu.on\b/gi,       'Muñón'],   // Muñon / Muon (encoding issues)
+    [/\bbaul\b/gi,        'baúl'],
+    [/\bNeblineros\b/gi,  'Neblineras'],
+    // Estandarizar género del descriptor de posición
+    [/\bTrasera\b/g,      'Trasero'],
+  ]
+  for (const [pattern, repl] of CORRECCIONES) {
+    s = s.replace(pattern, repl)
+  }
+
+  // ── 2. Expandir abreviaturas de posición ─────────────────────
+  // Orden: variantes con paréntesis primero, luego con punto
+
+  // (Delt.) / (delt.) / (Del.) / (del.)
+  s = s.replace(/\(Delt?\.\)/gi, 'Delantero')
+  // (Tras.) / (Trasero) / (Trasera) con paréntesis
+  s = s.replace(/\(Tras(?:ero|era|e?)\.?\)/gi, 'Trasero')
+
+  // delt. / Delt. → Delantero (con punto obligatorio)
+  s = s.replace(/\bDelt\.\s*/gi, 'Delantero ')
+  // del. → Delantero (solo con punto para no confundir con "del")
+  s = s.replace(/\bdel\.\s*/gi, 'Delantero ')
+
+  // Trase. / tras. / Tras. → Trasero (con punto)
+  s = s.replace(/\bTrase?\.\s*/gi, 'Trasero ')
+
+  // ── 3. Limpiar espacios ───────────────────────────────────────
+  s = s.replace(/\s+/g, ' ').trim()
+
+  return s
+}
+
+// ============================================================
 // IMPORTAR REPUESTOS DESDE EXCEL
 // ============================================================
 
@@ -976,17 +1028,19 @@ function ImportarRepuestosModal({ onClose, onSuccess }) {
       const parsed = []
       ws.eachRow((row, rowNum) => {
         if (rowNum === 1) return
-        const codigo = getText(row, colMap.codigo)
-        const nombre = getText(row, colMap.nombre)
-        if (!codigo && !nombre) return // fila vacía
+        const codigo      = getText(row, colMap.codigo)
+        const nombreRaw   = getText(row, colMap.nombre)
+        if (!codigo && !nombreRaw) return // fila vacía
         const errores = []
-        if (!codigo) errores.push('Sin código')
-        if (!nombre) errores.push('Sin artículo')
+        if (!codigo)    errores.push('Sin código')
+        if (!nombreRaw) errores.push('Sin artículo')
+        const nombreNorm = normalizarNombreRepuesto(nombreRaw)
         parsed.push({
-          _rowNum: rowNum,
-          _errores: errores,
+          _rowNum:         rowNum,
+          _errores:        errores,
+          _nombreOriginal: nombreRaw !== nombreNorm ? nombreRaw : null,
           codigo:           codigo.toUpperCase(),
-          nombre,
+          nombre:           nombreNorm,
           linea_modelo:     getText(row, colMap.linea_modelo) || null,
           categoria:        mapCategoria(getText(row, colMap.categoria)),
           precio_ref:       getNum(row, colMap.precio_ref),
@@ -1131,6 +1185,11 @@ function ImportarRepuestosModal({ onClose, onSuccess }) {
                         <AlertCircle size={13} /> {filasConError.length} con problemas (se omitirán)
                       </span>
                     )}
+                    {filas.filter(f => f._nombreOriginal).length > 0 && (
+                      <span className="text-blue-600 flex items-center gap-1">
+                        ✎ {filas.filter(f => f._nombreOriginal).length} nombres normalizados
+                      </span>
+                    )}
                     <span className="text-green-700 font-medium">{filasValidas.length} listas para importar</span>
                   </div>
 
@@ -1158,7 +1217,12 @@ function ImportarRepuestosModal({ onClose, onSuccess }) {
                                   : <span className="text-gray-700">{f.codigo}</span>
                                 }
                               </td>
-                              <td className="px-3 py-2 text-gray-900">{f.nombre || '—'}</td>
+                              <td className="px-3 py-2">
+                                <span className="text-gray-900">{f.nombre || '—'}</span>
+                                {f._nombreOriginal && (
+                                  <p className="text-[10px] text-gray-400 line-through mt-0.5">{f._nombreOriginal}</p>
+                                )}
+                              </td>
                               <td className="px-3 py-2 text-gray-600">{f.linea_modelo || '—'}</td>
                               <td className="px-3 py-2">
                                 <span className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium ${CATEGORIA_COLORS[f.categoria] ?? ''}`}>
