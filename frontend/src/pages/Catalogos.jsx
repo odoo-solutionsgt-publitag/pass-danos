@@ -426,8 +426,8 @@ function RepuestosTab({ esAdmin, puedeVerAnulados }) {
     // Ocultar inactivos: siempre si no tiene permiso, o si tiene permiso pero soloActivos está marcado
     if (!r.activo && (!puedeVerAnulados || soloActivos)) return false
     if (filtroCategoria && r.categoria !== filtroCategoria) return false
-    if (filtroMarca && r.marca !== filtroMarca) return false
-    if (filtroLinea && r.linea_modelo !== filtroLinea) return false
+    if (filtroMarca && r.marca?.toLowerCase() !== filtroMarca.toLowerCase()) return false
+    if (filtroLinea && r.linea_modelo?.toLowerCase() !== filtroLinea.toLowerCase()) return false
     if (filtroVigencia) {
       const v = vigenciaRepuesto(r.precio_actualizado_at)
       if (v.label !== filtroVigencia) return false
