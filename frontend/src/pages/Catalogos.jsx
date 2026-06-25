@@ -405,7 +405,11 @@ function RepuestosTab({ esAdmin, puedeVerAnulados }) {
     if (!r.activo && (!puedeVerAnulados || soloActivos)) return false
     if (filtroCategoria && r.categoria !== filtroCategoria) return false
     if (filtroMarca && r.marca?.toLowerCase() !== filtroMarca.toLowerCase()) return false
-    if (filtroLinea && r.linea_modelo?.toLowerCase() !== filtroLinea.toLowerCase()) return false
+    // Comparar sin espacios ni distinción de case (HI ACE == HIACE == hi ace)
+    if (filtroLinea) {
+      const norm = s => (s ?? '').toLowerCase().replace(/\s+/g, '')
+      if (norm(r.linea_modelo) !== norm(filtroLinea)) return false
+    }
     if (filtroVigencia) {
       const v = vigenciaRepuesto(r.precio_actualizado_at)
       if (v.label !== filtroVigencia) return false
