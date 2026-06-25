@@ -508,6 +508,22 @@ function RepuestosTab({ esAdmin, puedeVerAnulados }) {
           </label>
         )}
 
+        {/* Limpiar filtros — visible solo si hay algún filtro activo */}
+        {(busqueda || filtroCategoria || filtroMarca || filtroLinea || filtroVigencia) && (
+          <button
+            onClick={() => {
+              setBusqueda('')
+              setFiltroCategoria('')
+              setFiltroMarca('')
+              setFiltroLinea('')
+              setFiltroVigencia('')
+            }}
+            className="text-sm text-gray-400 hover:text-red-500 underline underline-offset-2 transition-colors"
+          >
+            Limpiar filtros
+          </button>
+        )}
+
         {esAdmin && (
           <div className="flex gap-2">
             <button
