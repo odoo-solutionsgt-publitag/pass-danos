@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Search, Pencil, X, Save, Wrench, Package, AlertCircle, CheckCircle2 } from 'lucide-react'
+import { Plus, Search, Pencil, X, Save, Wrench, Package, AlertCircle, CheckCircle2, Upload } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { usePermisos } from '../hooks/usePermisos'
 import TallerContactosEditor from '../components/TallerContactosEditor'
@@ -382,6 +382,7 @@ function RepuestosTab({ esAdmin }) {
   const [filtroVigencia, setFiltroVigencia] = useState('')
   const [soloActivos, setSoloActivos]     = useState(true)
   const [editando, setEditando]           = useState(null)
+  const [importando, setImportando]       = useState(false)
 
   function setMarcaFiltro(v) {
     setFiltroMarca(v)
@@ -504,13 +505,22 @@ function RepuestosTab({ esAdmin }) {
         </label>
 
         {esAdmin && (
-          <button
-            onClick={() => setEditando({})}
-            className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium px-4 py-2 rounded-lg"
-          >
-            <Plus size={16} />
-            Nuevo repuesto
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setImportando(true)}
+              className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium px-4 py-2 rounded-lg"
+            >
+              <Upload size={16} />
+              Importar Excel
+            </button>
+            <button
+              onClick={() => setEditando({})}
+              className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium px-4 py-2 rounded-lg"
+            >
+              <Plus size={16} />
+              Nuevo repuesto
+            </button>
+          </div>
         )}
       </div>
 
@@ -602,6 +612,12 @@ function RepuestosTab({ esAdmin }) {
           repuesto={editando}
           onClose={() => setEditando(null)}
           onSaved={() => { setEditando(null); load() }}
+        />
+      )}
+      {importando && (
+        <ImportarRepuestosModal
+          onClose={() => setImportando(false)}
+          onSuccess={() => load()}
         />
       )}
     </div>
@@ -848,6 +864,305 @@ function RepuestoModal({ repuesto, onClose, onSaved }) {
             <Save size={15} />
             {saving ? 'Guardando...' : 'Guardar'}
           </button>
+        </div>
+      </div>
+    </>
+  )
+}
+
+// ============================================================
+// IMPORTAR REPUESTOS DESDE EXCEL
+// ============================================================
+
+function ImportarRepuestosModal({ onClose, onSuccess }) {
+  const [marca, setMarca]         = useState('')
+  const [filas, setFilas]         = useState(null)
+  const [parseando, setParseando] = useState(false)
+  const [guardando, setGuardando] = useState(false)
+  const [resultado, setResultado] = useState(null)
+  const [error, setError]         = useState('')
+
+  const filasValidas  = filas?.filter(f => f._errores.length === 0) ?? []
+  const filasConError = filas?.filter(f => f._errores.length > 0) ?? []
+  const previewFilas  = filas?.slice(0, 25) ?? []
+  const hayMas        = (filas?.length ?? 0) > 25
+
+  async function handleFile(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setParseando(true)
+    setFilas(null)
+    setResultado(null)
+    setError('')
+    try {
+      const ExcelJS = (await import('exceljs')).default
+      const wb = new ExcelJS.Workbook()
+      await wb.xlsx.load(await file.arrayBuffer())
+      const ws = wb.worksheets[0]
+
+      // Detectar columnas por encabezado en fila 1
+      const colMap = {}
+      ws.getRow(1).eachCell({ includeEmpty: false }, (cell, col) => {
+        const h = cell.text?.toString().trim().toLowerCase()
+          .normalize('NFD').replace(/[̀-ͯ]/g, '')
+        if (/^no\.?$|^codigo/.test(h))             colMap.codigo         = col
+        else if (/modelo|linea/.test(h))            colMap.linea_modelo   = col
+        else if (/categor/.test(h))                 colMap.categoria      = col
+        else if (/articulo|nombre|repuesto/.test(h)) colMap.nombre        = col
+        else if (/lista|precio lista/.test(h))      colMap.precio_ref     = col
+        else if (/mano|m\.o/.test(h))               colMap.precio_mano_obra = col
+      })
+
+      const getText = (row, col) =>
+        col ? (row.getCell(col).text?.toString().trim() ?? '') : ''
+
+      const getNum = (row, col) => {
+        if (!col) return 0
+        const v = row.getCell(col).value
+        if (typeof v === 'number') return v
+        if (v && typeof v === 'object' && 'result' in v) return Number(v.result) || 0
+        return parseFloat(getText(row, col).replace(/,/g, '')) || 0
+      }
+
+      const mapCategoria = (raw) => {
+        const s = raw.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+        if (/rayon|golpe/.test(s)) return 'rayones_golpes_leves'
+        if (/^otro/.test(s)) return 'otro'
+        return 'repuesto'
+      }
+
+      const parsed = []
+      ws.eachRow((row, rowNum) => {
+        if (rowNum === 1) return
+        const codigo = getText(row, colMap.codigo)
+        const nombre = getText(row, colMap.nombre)
+        if (!codigo && !nombre) return // fila vacía
+        const errores = []
+        if (!codigo) errores.push('Sin código')
+        if (!nombre) errores.push('Sin artículo')
+        parsed.push({
+          _rowNum: rowNum,
+          _errores: errores,
+          codigo:           codigo.toUpperCase(),
+          nombre,
+          linea_modelo:     getText(row, colMap.linea_modelo) || null,
+          categoria:        mapCategoria(getText(row, colMap.categoria)),
+          precio_ref:       getNum(row, colMap.precio_ref),
+          precio_mano_obra: getNum(row, colMap.precio_mano_obra),
+        })
+      })
+      setFilas(parsed)
+    } catch (err) {
+      setError('Error al leer el archivo: ' + err.message)
+    } finally {
+      setParseando(false)
+    }
+  }
+
+  async function confirmar() {
+    if (filasValidas.length === 0) return
+    setGuardando(true)
+    setError('')
+    try {
+      const payload = filasValidas.map(f => ({
+        codigo:               f.codigo,
+        nombre:               f.nombre,
+        marca:                marca || null,
+        linea_modelo:         f.linea_modelo,
+        categoria:            f.categoria,
+        anios:                null,
+        precio_ref:           f.precio_ref,
+        precio_mano_obra:     f.precio_mano_obra,
+        precio_actualizado_at: new Date().toISOString(),
+        activo:               true,
+      }))
+      const { error: sbErr } = await supabase
+        .from('repuestos_catalogo')
+        .upsert(payload, { onConflict: 'codigo', ignoreDuplicates: false })
+      if (sbErr) throw sbErr
+      setResultado({ total: filasValidas.length, omitidas: filasConError })
+      onSuccess()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setGuardando(false)
+    }
+  }
+
+  function fmtQ(n) {
+    return n ? `Q ${Number(n).toLocaleString('es-GT', { minimumFractionDigits: 2 })}` : '—'
+  }
+
+  return (
+    <>
+      <div className="fixed inset-0 bg-black/40 z-40" onClick={onClose} />
+      <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-xl shadow-2xl z-50 w-full max-w-4xl max-h-[90vh] flex flex-col">
+
+        {/* Header */}
+        <div className="border-b border-gray-100 px-5 py-4 flex items-center justify-between shrink-0">
+          <h2 className="font-bold text-gray-900 flex items-center gap-2">
+            <Upload size={18} className="text-green-600" />
+            Importar repuestos desde Excel
+          </h2>
+          <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-700">
+            <X size={20} />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="overflow-y-auto flex-1 p-5 space-y-4">
+
+          {resultado ? (
+            /* ── Pantalla de resultado ── */
+            <div className="space-y-3">
+              <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-3 flex items-start gap-3">
+                <CheckCircle2 size={20} className="text-green-600 shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-medium text-green-800">Importación completada</p>
+                  <p className="text-sm text-green-700">
+                    Se procesaron {resultado.total} repuesto{resultado.total !== 1 ? 's' : ''} correctamente.
+                  </p>
+                </div>
+              </div>
+              {resultado.omitidas.length > 0 && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
+                  <p className="text-sm font-medium text-amber-800 mb-1">
+                    {resultado.omitidas.length} fila{resultado.omitidas.length !== 1 ? 's' : ''} omitida{resultado.omitidas.length !== 1 ? 's' : ''} (sin código o artículo):
+                  </p>
+                  <ul className="text-sm text-amber-700 space-y-0.5">
+                    {resultado.omitidas.map(f => (
+                      <li key={f._rowNum}>· Fila {f._rowNum}: {f._errores.join(', ')}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          ) : (
+            /* ── Formulario de importación ── */
+            <>
+              {error && (
+                <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-3 py-2 rounded-lg flex items-center gap-2">
+                  <AlertCircle size={15} /> {error}
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-4">
+                <Field label="Marca (aplica a todas las filas del archivo)">
+                  <select
+                    value={marca}
+                    onChange={e => setMarca(e.target.value)}
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-red-500 text-gray-700"
+                  >
+                    <option value="">— Sin marca</option>
+                    {MARCAS.map(m => <option key={m} value={m}>{m}</option>)}
+                  </select>
+                </Field>
+                <Field label="Archivo Excel">
+                  <label className={`flex items-center gap-2 px-3 py-2 text-sm border border-dashed rounded-lg cursor-pointer transition-colors ${
+                    parseando
+                      ? 'border-gray-200 text-gray-400'
+                      : 'border-gray-300 hover:border-green-500 hover:bg-green-50 text-gray-500'
+                  }`}>
+                    <Upload size={15} />
+                    {parseando ? 'Leyendo archivo...' : 'Seleccionar .xlsx'}
+                    <input
+                      type="file"
+                      accept=".xlsx,.xls"
+                      className="hidden"
+                      onChange={handleFile}
+                      disabled={parseando}
+                    />
+                  </label>
+                </Field>
+              </div>
+
+              <p className="text-xs text-gray-400">
+                Columnas esperadas: <span className="font-mono">No. · Modelo (Línea) · Categoría · Artículo · Precio Lista · Mano de Obra</span>
+              </p>
+
+              {filas !== null && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-4 text-sm flex-wrap">
+                    <span className="text-gray-500">{filas.length} filas detectadas</span>
+                    {filasConError.length > 0 && (
+                      <span className="text-amber-600 flex items-center gap-1">
+                        <AlertCircle size={13} /> {filasConError.length} con problemas (se omitirán)
+                      </span>
+                    )}
+                    <span className="text-green-700 font-medium">{filasValidas.length} listas para importar</span>
+                  </div>
+
+                  <div className="border border-gray-200 rounded-lg overflow-hidden">
+                    <div className="overflow-x-auto max-h-64">
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="bg-gray-50 border-b border-gray-200">
+                            <th className="px-3 py-2 text-left text-gray-500 font-medium w-8">Fila</th>
+                            <th className="px-3 py-2 text-left text-gray-500 font-medium">Código</th>
+                            <th className="px-3 py-2 text-left text-gray-500 font-medium">Artículo</th>
+                            <th className="px-3 py-2 text-left text-gray-500 font-medium">Línea</th>
+                            <th className="px-3 py-2 text-left text-gray-500 font-medium">Categoría</th>
+                            <th className="px-3 py-2 text-right text-gray-500 font-medium">Lista Q</th>
+                            <th className="px-3 py-2 text-right text-gray-500 font-medium">M.O. Q</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {previewFilas.map(f => (
+                            <tr key={f._rowNum} className={f._errores.length > 0 ? 'bg-red-50' : 'hover:bg-gray-50'}>
+                              <td className="px-3 py-2 text-gray-400">{f._rowNum}</td>
+                              <td className="px-3 py-2 font-mono">
+                                {f._errores.length > 0
+                                  ? <span className="text-red-600 flex items-center gap-1"><AlertCircle size={11} />{f._errores.join(', ')}</span>
+                                  : <span className="text-gray-700">{f.codigo}</span>
+                                }
+                              </td>
+                              <td className="px-3 py-2 text-gray-900">{f.nombre || '—'}</td>
+                              <td className="px-3 py-2 text-gray-600">{f.linea_modelo || '—'}</td>
+                              <td className="px-3 py-2">
+                                <span className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium ${CATEGORIA_COLORS[f.categoria] ?? ''}`}>
+                                  {CATEGORIA_LABELS[f.categoria] ?? f.categoria}
+                                </span>
+                              </td>
+                              <td className="px-3 py-2 text-right text-gray-700">{fmtQ(f.precio_ref)}</td>
+                              <td className="px-3 py-2 text-right text-gray-700">{fmtQ(f.precio_mano_obra)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    {hayMas && (
+                      <p className="text-center text-xs text-gray-400 py-2 border-t border-gray-100">
+                        … y {filas.length - 25} filas más
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="border-t border-gray-100 px-5 py-3 flex justify-end gap-2 shrink-0">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 rounded-lg"
+          >
+            {resultado ? 'Cerrar' : 'Cancelar'}
+          </button>
+          {!resultado && (
+            <button
+              onClick={confirmar}
+              disabled={guardando || filasValidas.length === 0}
+              className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium px-4 py-2 rounded-lg disabled:opacity-50"
+            >
+              <Upload size={15} />
+              {guardando
+                ? 'Guardando...'
+                : `Importar ${filasValidas.length} repuesto${filasValidas.length !== 1 ? 's' : ''}`
+              }
+            </button>
+          )}
         </div>
       </div>
     </>
