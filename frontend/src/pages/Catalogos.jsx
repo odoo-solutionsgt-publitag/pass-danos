@@ -1043,21 +1043,35 @@ function ImportarRepuestosModal({ onClose, onSuccess }) {
         return 'repuesto'
       }
 
+      // Prefijo de código: si hay línea seleccionada, ej: "AGYA" → "AGYA-"
+      const lineaUpper  = linea ? linea.toUpperCase().replace(/\s+/g, '') : ''
+      const buildCodigo = (raw) => {
+        const upper = raw.trim().toUpperCase()
+        // Si ya tiene letras (ej: AGYA-01) → se usa tal cual
+        if (/[A-Z]/.test(upper)) return upper
+        // Si es puramente numérico → formato LINEA-000001
+        if (/^\d+$/.test(upper) && lineaUpper) {
+          return `${lineaUpper}-${upper.padStart(6, '0')}`
+        }
+        return upper
+      }
+
       const parsed = []
       ws.eachRow((row, rowNum) => {
         if (rowNum === 1) return
-        const codigo      = getText(row, colMap.codigo)
+        const codigoRaw   = getText(row, colMap.codigo)
         const nombreRaw   = getText(row, colMap.nombre)
-        if (!codigo && !nombreRaw) return // fila vacía
+        if (!codigoRaw && !nombreRaw) return // fila vacía
         const errores = []
-        if (!codigo)    errores.push('Sin código')
+        if (!codigoRaw) errores.push('Sin código')
         if (!nombreRaw) errores.push('Sin artículo')
+        const codigo     = codigoRaw ? buildCodigo(codigoRaw) : ''
         const nombreNorm = normalizarNombreRepuesto(nombreRaw)
         parsed.push({
           _rowNum:         rowNum,
           _errores:        errores,
           _nombreOriginal: nombreRaw !== nombreNorm ? nombreRaw : null,
-          codigo:           codigo.toUpperCase(),
+          codigo,
           nombre:           nombreNorm,
           linea_modelo:     getText(row, colMap.linea_modelo) || null,
           categoria:        mapCategoria(getText(row, colMap.categoria)),
