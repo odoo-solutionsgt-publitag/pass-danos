@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Search, Pencil, X, Save, Wrench, Package, AlertCircle, CheckCircle2, Upload } from 'lucide-react'
+import { Plus, Search, Pencil, X, Save, Wrench, Package, AlertCircle, CheckCircle2, Upload, Ban } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { usePermisos } from '../hooks/usePermisos'
 import TallerContactosEditor from '../components/TallerContactosEditor'
@@ -38,7 +38,7 @@ const CATEGORIA_LABELS = {
 }
 
 export default function Catalogos() {
-  const { puedeCrear, puedeEditar } = usePermisos()
+  const { puedeCrear, puedeEditar, puedeVerAnulados } = usePermisos()
   const [tab, setTab] = useState('talleres')
 
   const esAdmin = puedeCrear || puedeEditar
@@ -74,7 +74,7 @@ export default function Catalogos() {
       </div>
 
       {tab === 'talleres' && <TalleresTab esAdmin={esAdmin} />}
-      {tab === 'repuestos' && <RepuestosTab esAdmin={esAdmin} />}
+      {tab === 'repuestos' && <RepuestosTab esAdmin={esAdmin} puedeVerAnulados={puedeVerAnulados} />}
     </div>
   )
 }
@@ -372,7 +372,7 @@ function vigenciaRepuesto(precio_actualizado_at) {
   return                   { label: 'Desactualizado', color: 'bg-red-100 text-red-700',     dias }
 }
 
-function RepuestosTab({ esAdmin }) {
+function RepuestosTab({ esAdmin, puedeVerAnulados }) {
   const [items, setItems]     = useState([])
   const [loading, setLoading] = useState(true)
   const [busqueda, setBusqueda]           = useState('')
@@ -383,6 +383,7 @@ function RepuestosTab({ esAdmin }) {
   const [soloActivos, setSoloActivos]     = useState(true)
   const [editando, setEditando]           = useState(null)
   const [importando, setImportando]       = useState(false)
+  const [anulando, setAnulando]           = useState(null) // ID del repuesto pendiente de confirmar
 
   function setMarcaFiltro(v) {
     setFiltroMarca(v)
@@ -403,8 +404,17 @@ function RepuestosTab({ esAdmin }) {
     setLoading(false)
   }
 
+  async function anularRepuesto(id) {
+    const { error } = await supabase
+      .from('repuestos_catalogo')
+      .update({ activo: false })
+      .eq('id', id)
+    if (!error) { setAnulando(null); load() }
+  }
+
   const filtrados = items.filter(r => {
-    if (soloActivos && !r.activo) return false
+    // Ocultar inactivos: siempre si no tiene permiso, o si tiene permiso pero soloActivos está marcado
+    if (!r.activo && (!puedeVerAnulados || soloActivos)) return false
     if (filtroCategoria && r.categoria !== filtroCategoria) return false
     if (filtroMarca && r.marca !== filtroMarca) return false
     if (filtroLinea && r.linea_modelo !== filtroLinea) return false
@@ -493,16 +503,18 @@ function RepuestosTab({ esAdmin }) {
           <option value="Sin precio">Sin precio</option>
         </select>
 
-        {/* Solo activos */}
-        <label className="flex items-center gap-2 text-sm text-gray-600">
-          <input
-            type="checkbox"
-            checked={soloActivos}
-            onChange={e => setSoloActivos(e.target.checked)}
-            className="rounded border-gray-300 text-red-600 focus:ring-red-500"
-          />
-          Solo activos
-        </label>
+        {/* Solo activos — solo visible si el usuario puede ver anulados */}
+        {puedeVerAnulados && (
+          <label className="flex items-center gap-2 text-sm text-gray-600">
+            <input
+              type="checkbox"
+              checked={soloActivos}
+              onChange={e => setSoloActivos(e.target.checked)}
+              className="rounded border-gray-300 text-red-600 focus:ring-red-500"
+            />
+            Solo activos
+          </label>
+        )}
 
         {esAdmin && (
           <div className="flex gap-2">
@@ -590,12 +602,42 @@ function RepuestosTab({ esAdmin }) {
                       </td>
                       {esAdmin && (
                         <td className="px-5 py-3.5 text-right">
-                          <button
-                            onClick={() => setEditando(r)}
-                            className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded"
-                          >
-                            <Pencil size={14} />
-                          </button>
+                          {anulando === r.id ? (
+                            <div className="flex items-center gap-1 justify-end">
+                              <span className="text-xs text-red-600 mr-1 whitespace-nowrap">¿Anular?</span>
+                              <button
+                                onClick={() => anularRepuesto(r.id)}
+                                className="px-2 py-1 text-xs font-medium text-white bg-red-600 hover:bg-red-700 rounded"
+                              >
+                                Sí
+                              </button>
+                              <button
+                                onClick={() => setAnulando(null)}
+                                className="px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100 rounded"
+                              >
+                                No
+                              </button>
+                            </div>
+                          ) : r.activo ? (
+                            <div className="flex items-center gap-1 justify-end">
+                              <button
+                                onClick={() => setEditando(r)}
+                                className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded"
+                                title="Editar"
+                              >
+                                <Pencil size={14} />
+                              </button>
+                              <button
+                                onClick={() => setAnulando(r.id)}
+                                className="p-1.5 text-gray-300 hover:text-red-600 hover:bg-red-50 rounded"
+                                title="Anular"
+                              >
+                                <Ban size={14} />
+                              </button>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-gray-300 italic">anulado</span>
+                          )}
                         </td>
                       )}
                     </tr>
