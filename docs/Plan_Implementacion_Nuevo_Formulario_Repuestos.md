@@ -1,66 +1,42 @@
 # Plan: Nuevo Formulario de Repuestos — Catálogo
 
 **Fecha:** 2026-06-24
-**Estado:** ✅ Fase 1 completada — en producción
-**Alcance:** Formulario de ingreso/edición manual + filtros de búsqueda. Importación masiva Excel = Fase 2 (pendiente).
+**Actualizado:** 2026-07-01
+**Estado:** ✅ Completado — Fase 1, Fase 2 e iteraciones en producción
 
 ---
 
 ## Contexto
 
-El formulario actual de repuestos tiene un campo libre de texto para Marca y Línea, y un único campo de precio (`precio_ref`). Se requiere:
+El formulario original de repuestos tenía campo libre para Marca y Línea y un único precio (`precio_ref`). Se requería:
 
-- Marca y Línea como selects enlazados (la Línea filtra según la Marca elegida)
+- Marca y Línea como selects enlazados
 - Categoría como select
 - 3 campos de precio: Precio Lista, Mano de Obra, Total (auto-calculado)
 
-Fuente de datos analizada: `docs/repuestos-agya.xlsx` y `docs/marcas-lineas.xlsx`.
+Fuente de datos: `docs/repuestos-agya.xlsx` y `docs/marcas-lineas.xlsx`.
 
 ---
 
-## Fase 1 — Formulario de ingreso manual
+## Fase 1 — Formulario de ingreso manual ✅
 
 ### 1. Migración de base de datos
 
 Archivo: `db/011_repuestos_nuevos_campos.sql`
 
 ```sql
--- Nuevas columnas de precio
 ALTER TABLE repuestos_catalogo
   ADD COLUMN IF NOT EXISTS precio_mano_obra NUMERIC(12,2) NOT NULL DEFAULT 0,
   ADD COLUMN IF NOT EXISTS precio_total     NUMERIC(12,2) NOT NULL DEFAULT 0,
   ADD COLUMN IF NOT EXISTS categoria        TEXT          NOT NULL DEFAULT 'repuesto'
     CHECK (categoria IN ('repuesto', 'rayones_golpes_leves', 'otro'));
-
--- El campo precio_ref existente pasa a ser "Precio Lista"
--- Se renombra en la UI pero la columna BD se mantiene como precio_ref
--- para no romper referencias existentes en cotizacion_lineas.
-
--- Recalcular precio_total en registros existentes
-UPDATE repuestos_catalogo
-SET precio_total = COALESCE(precio_ref, 0) + 0
-WHERE precio_total = 0;
-
--- Trigger: mantener precio_total sincronizado automáticamente
-CREATE OR REPLACE FUNCTION sync_precio_total_repuesto()
-RETURNS TRIGGER AS $$
-BEGIN
-  NEW.precio_total := COALESCE(NEW.precio_ref, 0) + COALESCE(NEW.precio_mano_obra, 0);
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER trg_sync_precio_total_repuesto
-  BEFORE INSERT OR UPDATE OF precio_ref, precio_mano_obra
-  ON repuestos_catalogo
-  FOR EACH ROW EXECUTE FUNCTION sync_precio_total_repuesto();
 ```
 
-> **Nota:** `precio_ref` sigue siendo la columna que usan las cotizaciones para auto-completar el precio unitario al seleccionar un repuesto. Con este cambio, `precio_ref` = Precio Lista. No se requiere modificar `cotizacion_lineas` ni `CotizacionesSection`.
+Trigger `trg_sync_precio_total_repuesto`: mantiene `precio_total = precio_ref + precio_mano_obra` automáticamente.
 
----
+> `precio_ref` sigue siendo la columna que usan las cotizaciones. No se requirió modificar `cotizacion_lineas`.
 
-### 2. Constantes front-end (dentro de `Catalogos.jsx`)
+### 2. Constantes front-end (`Catalogos.jsx`)
 
 ```js
 const MARCAS_LINEAS = {
@@ -71,8 +47,6 @@ const MARCAS_LINEAS = {
   Mazda:      ['CX5'],
 }
 
-const MARCAS = Object.keys(MARCAS_LINEAS).sort()  // orden alfabético
-
 const CATEGORIAS = [
   { value: 'repuesto',             label: 'Repuesto' },
   { value: 'rayones_golpes_leves', label: 'Rayones y Golpes Leves' },
@@ -80,33 +54,9 @@ const CATEGORIAS = [
 ]
 ```
 
----
+### 3. Formulario `RepuestoModal`
 
-### 3. Cambios en `RepuestoModal` (`Catalogos.jsx`)
-
-#### Estado del form
-```js
-const [form, setForm] = useState({
-  codigo:          repuesto.codigo || '',
-  nombre:          repuesto.nombre || '',
-  marca:           repuesto.marca || '',
-  linea_modelo:    repuesto.linea_modelo || '',
-  categoria:       repuesto.categoria || 'repuesto',   // NUEVO
-  anios:           repuesto.anios || '',
-  precio_ref:      repuesto.precio_ref ?? '',           // = Precio Lista
-  precio_mano_obra: repuesto.precio_mano_obra ?? '',   // NUEVO
-  // precio_total: calculado, no en state
-  activo:          repuesto.activo ?? true,
-})
-```
-
-#### Cálculo automático del Total
-```js
-const precioTotal = (Number(form.precio_ref) || 0) + (Number(form.precio_mano_obra) || 0)
-```
-Se muestra como campo read-only. No se guarda por separado en el state porque el trigger de BD lo sincroniza al guardar.
-
-#### Layout del formulario
+Layout:
 ```
 [Código *]   [Nombre * ──────────────────────]
 [Categoría ──────────────────────────────────]
@@ -117,119 +67,13 @@ Se muestra como campo read-only. No se guarda por separado en el state porque el
 □ Repuesto activo
 ```
 
-**Marca (select):**
-- Opciones: Toyota, Hyundai, Chevrolet, Mitsubishi, Mazda + opción vacía "— Sin marca"
-- Al cambiar marca → resetea `linea_modelo` a ''
+### 4. Tabla `RepuestosTab`
 
-**Línea / Modelo (select):**
-- Opciones: las líneas del `MARCAS_LINEAS[form.marca]`, o vacío si no hay marca seleccionada
-- Incluye siempre una opción vacía "— Sin línea"
-- Si la marca no tiene líneas mapeadas, se muestra un input libre de texto como fallback
+Columnas: `[☐] | Código | Repuesto | Categoría | Marca / Modelo | Años | Lista Q | M.O. Q | Total Q | Vigencia | [acciones]`
 
-**Total Q:**
-- Input `disabled`, fondo gris claro, muestra `precioTotal` formateado
-- Tooltip o etiqueta: "Calculado automáticamente"
+Badges de categoría: `repuesto` → gris · `rayones_golpes_leves` → ámbar · `otro` → azul
 
-#### Payload al guardar
-```js
-const payload = {
-  codigo:           form.codigo.trim().toUpperCase(),
-  nombre:           form.nombre.trim(),
-  marca:            form.marca || null,
-  linea_modelo:     form.linea_modelo || null,
-  categoria:        form.categoria,
-  anios:            form.anios.trim() || null,
-  precio_ref:       form.precio_ref === '' ? 0 : Number(form.precio_ref),
-  precio_mano_obra: form.precio_mano_obra === '' ? 0 : Number(form.precio_mano_obra),
-  // precio_total lo calcula el trigger de BD
-  activo:           form.activo,
-}
-```
-
----
-
-### 4. Cambios en la tabla `RepuestosTab`
-
-La tabla actual muestra: Código, Repuesto, Marca/Modelo, Años, Precio ref. Q, Vigencia.
-
-Ajustes:
-- Columna **"Precio ref. Q"** → renombrar a **"Lista Q"**
-- Agregar columna **"M.O. Q"** (Mano de Obra)
-- Agregar columna **"Total Q"**
-- Agregar columna **"Categoría"** (badge de color):
-  - `repuesto` → gris
-  - `rayones_golpes_leves` → ámbar
-  - `otro` → azul
-
-Orden de columnas propuesto:
-```
-Código | Repuesto | Categoría | Marca / Modelo | Años | Lista Q | M.O. Q | Total Q | Vigencia | [editar]
-```
-
-> La tabla se vuelve más ancha — se mantiene `overflow-x-auto` ya existente.
-
----
-
-### 5. Impacto en otras partes del sistema
-
-| Componente | Impacto | Acción |
-|------------|---------|--------|
-| `CotizacionesSection.jsx` | Usa `precio_ref` al seleccionar repuesto | Ninguna — sigue usando `precio_ref` (Precio Lista) |
-| `repuestos_catalogo` RLS | Solo admin/agente_senior puede modificar | Sin cambio |
-| `precio_actualizado_at` | Se sigue marcando con el checkbox existente | Sin cambio |
-
----
-
-## Filtros de búsqueda (implementado post-Fase 1)
-
-Solicitado tras validar el formulario en producción. Cambios solo en frontend, sin migración BD.
-
-**Nuevos filtros en la barra de `RepuestosTab`:**
-
-| Filtro | Comportamiento |
-|--------|---------------|
-| Categoría | Select: Todas / Repuesto / Rayones y Golpes Leves / Otro |
-| Marca | Select: Todas / Toyota / Hyundai / Chevrolet / Mitsubishi / Mazda |
-| Línea | Select dependiente de Marca — aparece solo si hay marca seleccionada; se resetea al cambiar marca |
-| Vigencia | Ya existía (Vigente / Revisar / Desactualizado / Sin precio) |
-
-Todos los filtros son client-side (los datos ya están cargados en memoria). Se combinan acumulativamente con la búsqueda de texto libre existente.
-
----
-
-## Fase 2 — Importación masiva desde Excel (pendiente)
-
-**Formato esperado** (igual al `repuestos-agya.xlsx`):
-
-| No. | Modelo (Línea) | Categoría | Artículo | Precio Lista | Mano de Obra | Total |
-|-----|----------------|-----------|----------|--------------|--------------|-------|
-
-**Comportamiento:**
-- Botón "Importar Excel" en la barra de filtros de RepuestosTab
-- Parseo client-side con `xlsx` (npm, carga dinámica como `exceljs`)
-- Preview de filas antes de confirmar
-- Insert bulk vía Supabase `upsert` usando `codigo` como clave de conflicto
-- Reporte de éxito/error por fila
-
-> Este módulo se planificará en un documento separado una vez validado el formulario manual.
-
----
-
-## Orden de implementación (Fase 1)
-
-1. ✅ Ejecutar `db/011_repuestos_nuevos_campos.sql` en Supabase
-2. ✅ Actualizar `Catalogos.jsx`:
-   - Agregar constantes `MARCAS_LINEAS` y `CATEGORIAS`
-   - Modificar `RepuestoModal` (state, layout, selects, precios)
-   - Actualizar tabla en `RepuestosTab` (columnas nuevas, badge categoría)
-   - Agregar filtros Categoría / Marca / Línea / Vigencia en barra de búsqueda
-3. ✅ Commit + push → deploy frontend
-
-No requiere cambios en backend ni en ninguna otra página.
-
----
-
-## Commits de referencia (rama main)
+### 5. Commits Fase 1
 
 | Hash | Descripción |
 |------|-------------|
@@ -238,17 +82,191 @@ No requiere cambios en backend ni en ninguna otra página.
 
 ---
 
-## Sesión 2026-06-24 — Otros cambios implementados
+## Filtros de búsqueda ✅ (post-Fase 1)
 
-Además del formulario de repuestos, en la misma sesión se implementaron:
+Barra de filtros en `RepuestosTab`:
 
-### Permiso `ver_anulados` por usuario
-- Nuevo flag `ver_anulados` en el JSONB `perfiles.permisos`
-- Solo usuarios con ese flag ven daños anulados y servicios cancelados en: Lista Daños/Servicios, Dashboard, Reporte Diario, Bitácora, Flota, Proformas
-- Preset Admin lo activa por defecto; los demás en `false`
-- Columna nueva `👁‍🗨` visible en la tabla de Usuarios y permisos
+| Filtro | Comportamiento |
+|--------|---------------|
+| Texto libre | Busca en código, nombre, marca, línea |
+| Categoría | Select: Todas / Repuesto / Rayones y Golpes Leves / Otro |
+| Marca | Select: Todas / Toyota / Hyundai / Chevrolet / Mitsubishi / Mazda |
+| Línea | Dependiente de Marca — aparece solo si hay marca seleccionada |
+| Vigencia | Vigente / Revisar / Desactualizado / Sin precio |
+| Limpiar filtros | Aparece solo si hay algún filtro activo, resetea todo |
+
+Todos los filtros son client-side (AND acumulativo). Comparaciones de Marca y Línea son **case-insensitive e insensibles a espacios** (`HI ACE == HIACE`).
+
+---
+
+## Fase 2 — Importación masiva desde Excel ✅
+
+### Formatos de Excel soportados
+
+Los archivos de la flota NO tienen un formato uniforme. Se detectan columnas por encabezado (NFD normalizado, sin tildes):
+
+| Columna | Regex de detección | Campo BD |
+|---------|-------------------|----------|
+| No. / Código | `/^no\.?$\|^codigo/` | `codigo` |
+| Modelo / Línea | `/modelo\|linea/` | `linea_modelo` |
+| Categoría | `/categor/` | `categoria` |
+| Artículo / Nombre | `/articulo\|nombre\|repuesto/` | `nombre` |
+| Precio Lista | `/lista\|precio lista/` | `precio_ref` |
+| Mano de Obra / M.O. | `/mano\|m\.o/` | `precio_mano_obra` |
+
+Si la columna no existe → el campo queda en su default (ej. `categoria = 'repuesto'`).
+
+### Modal `ImportarRepuestosModal`
+
+Tres campos de contexto:
+- **Marca** (select) — se aplica a todos los registros importados
+- **Línea** (select dependiente de Marca) — fallback cuando el Excel no tiene columna Línea (ej. Agya)
+- **Archivo** (input file, `.xlsx`)
+
+### Formato de código generado
+
+```js
+const lineaUpper = linea.toUpperCase().replace(/\s+/g, '')  // 'HI ACE' → 'HIACE'
+// Si el código del Excel tiene letras → se usa tal cual (ej: 'AGYA-001')
+// Si es numérico puro → LINEA-NNNNNN (6 dígitos con ceros)
+// Ejemplo: id=12, línea=Agya → 'AGYA-000012'
+```
+
+### Normalización de nombres (`normalizarNombreRepuesto`)
+
+Correcciones tipográficas aplicadas automáticamente al importar:
+
+| Incorrecto | Correcto |
+|-----------|----------|
+| Bomper / Bompers | Bumper / Bumpers |
+| delt. / Tras. / Lat. | Delantero / Trasero / Lateral |
+| Izq. / Der. / Int. / Ext. | Izquierdo / Derecho / Interior / Exterior |
+| Alineacion | Alineación |
+| Perciana | Persiana |
+| Rajilla / Regilla | Rejilla |
+| Magnecio | Magnesio |
+| Tapiceria | Tapicería |
+| Bateria | Batería |
+| Tricket | Trinquete |
+| Capo | Capó |
+| Faldon | Faldón |
+| Neblineros | Neblineras |
+| Trasera (en contexto de repuesto) | Trasero |
+
+La preview del modal muestra el nombre original tachado cuando fue normalizado, con contador "✎ X nombres normalizados".
+
+### Upsert
+
+```js
+supabase.from('repuestos_catalogo')
+  .upsert(payload, { onConflict: 'codigo', ignoreDuplicates: false })
+```
+
+Idempotente: reimportar el mismo archivo actualiza precios sin duplicar.
+
+### Commits Fase 2
+
+| Hash | Descripción |
+|------|-------------|
+| `<hash-import>` | feat(catalogos): importacion masiva Excel con preview y upsert |
+| `<hash-norm>` | feat(catalogos): normalizacion automatica de nombres en import |
+| `<hash-linea-modal>` | feat(catalogos): selector Linea en modal de importacion |
+
+---
+
+## Iteraciones post-Fase 2 ✅ (2026-07-01)
+
+### Submenú de Catálogos en Sidebar
+
+El ítem "Catálogos" del sidebar se separó en dos sublinks:
+- **Talleres** → `/catalogos?tab=talleres`
+- **Repuestos** → `/catalogos?tab=repuestos`
+
+Cada sección se muestra sin tabs visuales; el tab activo viene del `?tab=` de la URL. El ítem activo se resalta en rojo en el sidebar.
+
+Commits: `02a7788` (eliminar tabs), `79e0960` (filtros case-insensitive), `2008d14` (insensible a espacios)
+
+### Botón Anular
+
+Botón `Ban` a la derecha del lápiz (editar). Inline confirmation "¿Anular? Sí / No". Registros anulados (`activo = false`) se ocultan para usuarios sin permiso `ver_anulados`. No hay recuperación desde la UI de producción.
+
+### Filtros robustos
+
+- Marca y Línea: comparación **case-insensitive**
+- Línea: además **insensible a espacios** (`HIACE == HI ACE`)
+- Botón **"Limpiar filtros"**: aparece solo cuando hay algún filtro activo
+
+Commit: `ee250b0`
+
+### Paginación + Orden + Modo Presupuesto
+
+Commit: `48f17ab`
+
+**Paginación:**
+- Botones 10 / 25 / 50 / Todos en la barra de filtros
+- Pie de tabla: "1–25 de 645" con navegación numérica
+
+**Ordenado:**
+- Tabla siempre ordenada A→Z por nombre de repuesto (`localeCompare('es')`)
+
+**Modo Presupuesto:**
+- Columna de checkbox a la izquierda del Código (cabecera selecciona/deselecciona todos los visibles)
+- Filas marcadas se resaltan en azul claro
+- Al marcar ≥1 registro → aparece botón **"Presupuesto (N)"** en la barra
+- Al hacer clic → banner azul, tabla muestra solo los seleccionados, fila **TOTAL** al pie con suma de Lista Q, M.O. Q y Total Q
+- Botón **"Salir"** en el banner → vuelve a la vista normal y limpia selección
+
+---
+
+## Correcciones de datos en producción
+
+### AGYA — caso especial (2026-07-01)
+
+El archivo `docs/repuestos-agya.xlsx` no tiene columnas Línea ni Categoría. Todos los registros quedaron con:
+- `categoria = 'repuesto'` (default correcto)
+- `linea_modelo = 'AGYA'` (todo caps, incorrecto — debía ser `'Agya'`)
+- `codigo` numérico puro (`1`, `22`...) en lugar de `AGYA-000001`, `AGYA-000022`
+
+SQL de corrección aplicado en Supabase:
+
+```sql
+UPDATE repuestos_catalogo
+SET
+  linea_modelo = 'Agya',
+  codigo       = 'AGYA-' || LPAD(codigo, 6, '0')
+WHERE linea_modelo = 'AGYA'
+  AND codigo ~ '^[0-9]+$';
+```
+
+### HI ACE / HI LUX (2026-07-01)
+
+Importados como `'HIACE'` / `'HILUX'` (sin espacio). Corregidos a `'HI ACE'` / `'HI LUX'`:
+
+```sql
+UPDATE repuestos_catalogo SET linea_modelo = 'HI ACE' WHERE LOWER(REPLACE(linea_modelo,' ','')) = 'hiace';
+UPDATE repuestos_catalogo SET linea_modelo = 'HI LUX' WHERE LOWER(REPLACE(linea_modelo,' ','')) = 'hilux';
+```
+
+---
+
+## Estado del catálogo (2026-07-01)
+
+| categoria | registros |
+|-----------|-----------|
+| `repuesto` | 463 |
+| `rayones_golpes_leves` | 182 |
+| **Total** | **645** |
+
+Vehículos importados hasta la fecha: Toyota Agya, Toyota HI LUX, Chevrolet Tracker (y otros con categoría Rayones).
+Pendientes de importar: Corolla, HI ACE, Innova, Prado, Yaris, SANTA FE, Staria, Suburban, L200, Montero, CX5.
+
+---
+
+## Sesión 2026-06-24 — Otros cambios
+
+### Permiso `ver_anulados`
+- Flag en `perfiles.permisos` JSONB
 - Commit: `d9059e6`
 
 ### PDF Pase de Salida actualizado
-- Subido `Pase-Salida-Contrato-Interno-Pass-2026.pdf` actualizado en `frontend/public/pdfs/`
 - Commit: `25c00b8`
