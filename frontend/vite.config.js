@@ -14,6 +14,9 @@ export default defineConfig({
   preview: {
     host: '0.0.0.0',
     port: 5173,
-    allowedHosts: ['gestion-danos.odoo-server.online'],
+    allowedHosts: [
+      'gestion-danos.odoo-server.online',
+      'gestion-danos.passrentacar.com.gt',
+    ],
   },
 })
