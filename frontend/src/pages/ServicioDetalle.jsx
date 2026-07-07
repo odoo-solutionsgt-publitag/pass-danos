@@ -364,7 +364,11 @@ export default function ServicioDetalle() {
                   confirmLabel: 'Autorizar',
                   showAuth: true,
                   onConfirm: () => {
-                    if (!autorizadoPor.trim()) return
+                    console.log('[ServicioDetalle] autorizadoPor:', autorizadoPor)
+                    if (!autorizadoPor.trim()) {
+                      console.warn('[ServicioDetalle] autorizadoPor está vacío')
+                      return
+                    }
                     ejecutar('aprobado', {
                       autorizado_por: autorizadoPor.trim(),
                       fecha_autorizacion: new Date().toISOString().slice(0, 10),
