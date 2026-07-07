@@ -358,30 +358,42 @@ export default function ServicioDetalle() {
             {/* programado + requiere_autorizacion → Autorizar */}
             {puedeEditar && estado === 'programado' && orden.requiere_autorizacion && (
               <button
-                onClick={() => setConfirm({
-                  titulo: 'Autorizar orden de servicio',
-                  mensaje: 'Ingresa el nombre de quien autoriza esta orden.',
-                  confirmLabel: 'Autorizar',
-                  showAuth: true,
-                  onConfirm: () => {
-                    console.log('[ServicioDetalle] autorizadoPor:', autorizadoPor)
-                    if (!autorizadoPor.trim()) {
-                      console.warn('[ServicioDetalle] autorizadoPor está vacío')
-                      return
-                    }
-                    ejecutar('aprobado', {
-                      autorizado_por: autorizadoPor.trim(),
-                      fecha_autorizacion: new Date().toISOString().slice(0, 10),
-                    })
-                    setAutorizadoPor('')
-                  },
-                })}
+                onClick={() => {
+                  if (!autorizadoPor.trim()) {
+                    console.warn('[ServicioDetalle] autorizadoPor está vacío, no se abre modal')
+                    return
+                  }
+                  setConfirm({
+                    titulo: 'Autorizar orden de servicio',
+                    mensaje: `¿Confirmar autorización por ${autorizadoPor}?`,
+                    confirmLabel: 'Autorizar',
+                    onConfirm: () => {
+                      console.log('[ServicioDetalle] Autorizando por:', autorizadoPor)
+                      ejecutar('aprobado', {
+                        autorizado_por: autorizadoPor.trim(),
+                        fecha_autorizacion: new Date().toISOString().slice(0, 10),
+                      })
+                      setAutorizadoPor('')
+                    },
+                  })
+                }}
                 disabled={saving}
                 className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg disabled:opacity-50"
               >
                 <CheckCircle2 size={15} />
                 Autorizar
               </button>
+            )}
+
+            {/* Input para autorización (visible antes de clickear) */}
+            {puedeEditar && estado === 'programado' && orden.requiere_autorizacion && (
+              <input
+                type="text"
+                value={autorizadoPor}
+                onChange={e => setAutorizadoPor(e.target.value)}
+                placeholder="Nombre de quien autoriza *"
+                className="px-3 py-2 border border-amber-300 rounded-lg text-sm focus:outline-none focus:border-blue-400 bg-amber-50"
+              />
             )}
 
             {/* programado sin auth → Enviar a taller */}
