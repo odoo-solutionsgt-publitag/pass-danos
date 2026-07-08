@@ -144,7 +144,7 @@ export async function exportarFlotillaXLS(vehiculos) {
     const dataRow = ws.getRow(currentRowNum)
     const datos = [
       v._numero,
-      v.x_studio_status_vehiculo || '—',
+      v.status || '—',
       v.tipo_vehiculo || '—',
       v.placa || '—',
       v.marca || '—',
@@ -273,7 +273,7 @@ export async function exportarFlotilaPDF(vehiculos) {
     html += `
       <tr style="background-color: ${vehiculosAgrupados.indexOf(v) % 2 === 0 ? '#f9f9f9' : 'white'};">
         <td style="border: 1px solid #ccc; padding: 8px; text-align: center;">${v._numero}</td>
-        <td style="border: 1px solid #ccc; padding: 8px;">${v.x_studio_status_vehiculo || '—'}</td>
+        <td style="border: 1px solid #ccc; padding: 8px;">${v.status || '—'}</td>
         <td style="border: 1px solid #ccc; padding: 8px;">${v.tipo_vehiculo || '—'}</td>
         <td style="border: 1px solid #ccc; padding: 8px; font-weight: bold;">${v.placa || '—'}</td>
         <td style="border: 1px solid #ccc; padding: 8px;">${v.marca || '—'}</td>
