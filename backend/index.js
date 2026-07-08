@@ -161,22 +161,24 @@ async function getVehiculoFromOrder(uid, orderId, orderLines) {
 
     const productId = lines[0].product_template_id[0];
     const productos = await odooExecute(uid, 'product.template', 'read', [[productId]], {
-      fields: ['id', 'name', 'default_code', 'x_studio_tipo_de_vehiculo', 'x_studio_status_vehiculo'],
+      fields: ['id', 'name', 'default_code', 'x_studio_tipo_de_vehiculo', 'x_studio_status_vehiculo', 'x_studio_marca', 'x_studio_linea', 'x_studio_modelo'],
     });
 
     if (!productos.length) return null;
     const p = productos[0];
     const tipo = p.x_studio_tipo_de_vehiculo || '';
-    const parsed = parseProductName(p.name, p.default_code, tipo);
+    const marca = p.x_studio_marca || '';
+    const linea = p.x_studio_linea || '';
+    const modelo = p.x_studio_modelo || '';
     return {
       odoo_id: p.id,
       nombre: p.name,
       placa: p.default_code || '',
       tipo_vehiculo: tipo,
       status: p.x_studio_status_vehiculo || '',
-      marca: parsed.marca,
-      linea: parsed.linea,
-      anio: parsed.anio,
+      marca: marca,
+      linea: linea,
+      anio: modelo ? parseInt(modelo) : null,
     };
   } catch (err) {
     console.warn('[getVehiculoFromOrder] Error:', err.message);
@@ -629,14 +631,16 @@ app.get('/vehiculos', async (req, res) => {
     if (req.query.placa) domain.push(['default_code', 'ilike', req.query.placa]);
 
     const vehiculos = await odooExecute(uid, 'product.template', 'search_read', [domain], {
-      fields: ['id', 'name', 'default_code', 'x_studio_tipo_de_vehiculo', 'x_studio_status_vehiculo', 'x_studio_tipo_de_servicio', 'x_studio_color_vehiculo', 'categ_id'],
+      fields: ['id', 'name', 'default_code', 'x_studio_tipo_de_vehiculo', 'x_studio_status_vehiculo', 'x_studio_tipo_de_servicio', 'x_studio_color_vehiculo', 'categ_id', 'x_studio_marca', 'x_studio_linea', 'x_studio_modelo'],
       order: 'default_code asc',
       limit: parseInt(req.query.limit) || 200,
     });
 
     const result = vehiculos.map(v => {
       const tipo = v.x_studio_tipo_de_vehiculo || '';
-      const parsed = parseProductName(v.name, v.default_code, tipo);
+      const marca = v.x_studio_marca || '';
+      const linea = v.x_studio_linea || '';
+      const modelo = v.x_studio_modelo || '';
       return {
         odoo_id: v.id,
         nombre: v.name,
@@ -645,9 +649,9 @@ app.get('/vehiculos', async (req, res) => {
         status: v.x_studio_status_vehiculo || '',
         tipo_servicio: v.x_studio_tipo_de_servicio || '',
         color: v.x_studio_color_vehiculo || '',
-        marca: parsed.marca,
-        linea: parsed.linea,
-        anio: parsed.anio,
+        marca: marca,
+        linea: linea,
+        anio: modelo ? parseInt(modelo) : null,
       };
     });
 
@@ -670,7 +674,7 @@ app.get('/vehiculo/:placa', async (req, res) => {
     const vehiculos = await odooExecute(uid, 'product.template', 'search_read', [
       [['default_code', '=', placa]]
     ], {
-      fields: ['id', 'name', 'default_code', 'x_studio_tipo_de_vehiculo', 'x_studio_status_vehiculo', 'x_studio_color_vehiculo'],
+      fields: ['id', 'name', 'default_code', 'x_studio_tipo_de_vehiculo', 'x_studio_status_vehiculo', 'x_studio_color_vehiculo', 'x_studio_marca', 'x_studio_linea', 'x_studio_modelo'],
       limit: 1,
     });
 
@@ -718,7 +722,9 @@ app.get('/vehiculo/:placa', async (req, res) => {
     }
 
     const tipo = vehiculo.x_studio_tipo_de_vehiculo || '';
-    const parsed = parseProductName(vehiculo.name, vehiculo.default_code, tipo);
+    const marca = vehiculo.x_studio_marca || '';
+    const linea = vehiculo.x_studio_linea || '';
+    const modelo = vehiculo.x_studio_modelo || '';
     res.json({
       vehiculo: {
         odoo_id: vehiculo.id,
@@ -727,9 +733,9 @@ app.get('/vehiculo/:placa', async (req, res) => {
         tipo_vehiculo: tipo,
         status: vehiculo.x_studio_status_vehiculo || '',
         color: vehiculo.x_studio_color_vehiculo || '',
-        marca: parsed.marca,
-        linea: parsed.linea,
-        anio: parsed.anio,
+        marca: marca,
+        linea: linea,
+        anio: modelo ? parseInt(modelo) : null,
       },
       contrato,
     });
