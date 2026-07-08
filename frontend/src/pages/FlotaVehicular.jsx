@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { RefreshCw, Search, X, Car, Calendar, User, Phone, Mail, FileText, AlertCircle, ClipboardList } from 'lucide-react'
+import { RefreshCw, Search, X, Car, Calendar, User, Phone, Mail, FileText, AlertCircle, ClipboardList, Download } from 'lucide-react'
 import { fetchVehiculos, fetchVehiculo } from '../lib/odoo-api'
 import { supabase } from '../lib/supabase'
 import { siniestrosQuery, ordenesServicioQuery } from '../lib/queries'
+import { exportarFlotillaXLS, exportarFlotilaPDF } from '../lib/exportarFlotilla'
 import { usePermisos } from '../hooks/usePermisos'
 import { formatDate as fmtDateLib } from '../lib/fecha'
 
@@ -79,6 +80,7 @@ export default function FlotaVehicular() {
   const [vistaPor, setVistaPor]     = useState('estado')  // 'estado' | 'tipo'
 
   const [seleccionado, setSeleccionado] = useState(null)
+  const [exportando, setExportando] = useState(null)  // null | 'pdf' | 'xls'
 
   useEffect(() => { loadFlota() }, [])
 
@@ -92,6 +94,30 @@ export default function FlotaVehicular() {
       setError('No se pudo cargar la flota. Verifique la conexión al backend.')
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function handleExportarXLS() {
+    setExportando('xls')
+    try {
+      await exportarFlotillaXLS(vehiculosFiltrados)
+    } catch (err) {
+      console.error('[FlotaVehicular] Error exportando XLS:', err)
+      setError(`Error exportando XLS: ${err.message}`)
+    } finally {
+      setExportando(null)
+    }
+  }
+
+  async function handleExportarPDF() {
+    setExportando('pdf')
+    try {
+      await exportarFlotilaPDF(vehiculosFiltrados)
+    } catch (err) {
+      console.error('[FlotaVehicular] Error exportando PDF:', err)
+      setError(`Error exportando PDF: ${err.message}`)
+    } finally {
+      setExportando(null)
     }
   }
 
@@ -134,14 +160,32 @@ export default function FlotaVehicular() {
             {vehiculosFiltrados.length !== vehiculos.length && ` · ${vehiculosFiltrados.length} mostrados`}
           </p>
         </div>
-        <button
-          onClick={loadFlota}
-          disabled={loading}
-          className="flex items-center gap-2 px-3 py-2 text-sm border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 disabled:opacity-50"
-        >
-          <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
-          Actualizar
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleExportarPDF}
+            disabled={loading || exportando !== null || vehiculosFiltrados.length === 0}
+            className="flex items-center gap-2 px-3 py-2 text-sm border border-red-200 text-red-600 rounded-lg hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <FileText size={15} />
+            {exportando === 'pdf' ? 'Generando...' : 'PDF'}
+          </button>
+          <button
+            onClick={handleExportarXLS}
+            disabled={loading || exportando !== null || vehiculosFiltrados.length === 0}
+            className="flex items-center gap-2 px-3 py-2 text-sm border border-green-200 text-green-600 rounded-lg hover:bg-green-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Download size={15} />
+            {exportando === 'xls' ? 'Generando...' : 'XLS'}
+          </button>
+          <button
+            onClick={loadFlota}
+            disabled={loading}
+            className="flex items-center gap-2 px-3 py-2 text-sm border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+          >
+            <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
+            Actualizar
+          </button>
+        </div>
       </div>
 
       {/* KPI cards */}
