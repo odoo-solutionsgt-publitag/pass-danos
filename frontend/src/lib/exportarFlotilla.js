@@ -1,7 +1,7 @@
 import { formatDate } from './fecha'
 
 /**
- * Agrupa vehículos por tipo → línea → modelo
+ * Agrupa vehículos por tipo → línea → estado → modelo
  */
 function agruparVehiculos(vehiculos) {
   const grupos = {};
@@ -9,14 +9,15 @@ function agruparVehiculos(vehiculos) {
   vehiculos.forEach(v => {
     const tipo = v.tipo_vehiculo || 'Sin tipo';
     const linea = v.linea || 'Sin línea';
-    const modelo = v.anio || 0;
+    const estado = v.status || 'Sin estado';
 
     if (!grupos[tipo]) grupos[tipo] = {};
-    if (!grupos[tipo][linea]) grupos[tipo][linea] = [];
-    grupos[tipo][linea].push(v);
+    if (!grupos[tipo][linea]) grupos[tipo][linea] = {};
+    if (!grupos[tipo][linea][estado]) grupos[tipo][linea][estado] = [];
+    grupos[tipo][linea][estado].push(v);
   });
 
-  // Ordenar tipo alfabético, línea alfabético, modelo ascendente
+  // Ordenar: tipo alfabético, línea alfabética, estado alfabético, modelo ascendente
   const tiposOrdenados = Object.keys(grupos).sort();
   const resultado = [];
   let numeroCorrelativo = 1;
@@ -24,9 +25,12 @@ function agruparVehiculos(vehiculos) {
   tiposOrdenados.forEach(tipo => {
     const lineasOrdenadas = Object.keys(grupos[tipo]).sort();
     lineasOrdenadas.forEach(linea => {
-      const vehiculosDeLinea = grupos[tipo][linea].sort((a, b) => (a.anio || 0) - (b.anio || 0));
-      vehiculosDeLinea.forEach(v => {
-        resultado.push({ ...v, _numero: numeroCorrelativo++, _tipo: tipo, _linea: linea });
+      const estadosOrdenados = Object.keys(grupos[tipo][linea]).sort();
+      estadosOrdenados.forEach(estado => {
+        const vehiculosDeEstado = grupos[tipo][linea][estado].sort((a, b) => (a.anio || 0) - (b.anio || 0));
+        vehiculosDeEstado.forEach(v => {
+          resultado.push({ ...v, _numero: numeroCorrelativo++, _tipo: tipo, _linea: linea, _estado: estado });
+        });
       });
     });
   });
@@ -113,6 +117,7 @@ export async function exportarFlotillaXLS(vehiculos) {
   let currentRowNum = 6
   let ultimoTipo = null
   let ultimaLinea = null
+  let ultimoEstado = null
 
   vehiculosAgrupados.forEach(v => {
     // Encabezado de Tipo si cambió
@@ -126,6 +131,7 @@ export async function exportarFlotillaXLS(vehiculos) {
       currentRowNum++
       ultimoTipo = v._tipo
       ultimaLinea = null
+      ultimoEstado = null
     }
 
     // Encabezado de Línea si cambió
@@ -138,6 +144,19 @@ export async function exportarFlotillaXLS(vehiculos) {
       lineaRow.height = 16
       currentRowNum++
       ultimaLinea = v._linea
+      ultimoEstado = null
+    }
+
+    // Encabezado de Estado si cambió
+    if (v._estado !== ultimoEstado) {
+      const estadoRow = ws.getRow(currentRowNum)
+      estadoRow.getCell(1).value = `    ${v._estado}`
+      estadoRow.getCell(1).font = { name: 'Calibri', size: 9, bold: true, color: { argb: 'FF34495E' } }
+      estadoRow.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD5DBDB' } }
+      ws.mergeCells(currentRowNum, 1, currentRowNum, 7)
+      estadoRow.height = 14
+      currentRowNum++
+      ultimoEstado = v._estado
     }
 
     // Fila de datos
@@ -246,6 +265,7 @@ export async function exportarFlotilaPDF(vehiculos) {
 
   let ultimoTipo = null
   let ultimaLinea = null
+  let ultimoEstado = null
 
   vehiculosAgrupados.forEach(v => {
     // Encabezado de Tipo si cambió
@@ -257,6 +277,7 @@ export async function exportarFlotilaPDF(vehiculos) {
       `
       ultimoTipo = v._tipo
       ultimaLinea = null
+      ultimoEstado = null
     }
 
     // Encabezado de Línea si cambió
@@ -267,6 +288,17 @@ export async function exportarFlotilaPDF(vehiculos) {
         </tr>
       `
       ultimaLinea = v._linea
+      ultimoEstado = null
+    }
+
+    // Encabezado de Estado si cambió
+    if (v._estado !== ultimoEstado) {
+      html += `
+        <tr style="background-color: #D5DBDB;">
+          <td colspan="7" style="border: 1px solid #ccc; padding: 6px 8px; font-weight: bold; color: #34495E; font-size: 12px;">&nbsp;&nbsp;&nbsp;&nbsp;${v._estado}</td>
+        </tr>
+      `
+      ultimoEstado = v._estado
     }
 
     // Fila de datos
