@@ -1,6 +1,40 @@
 import { formatDate } from './fecha'
 
 /**
+ * Agrupa vehículos por tipo → línea → modelo
+ */
+function agruparVehiculos(vehiculos) {
+  const grupos = {};
+
+  vehiculos.forEach(v => {
+    const tipo = v.tipo_vehiculo || 'Sin tipo';
+    const linea = v.linea || 'Sin línea';
+    const modelo = v.anio || 0;
+
+    if (!grupos[tipo]) grupos[tipo] = {};
+    if (!grupos[tipo][linea]) grupos[tipo][linea] = [];
+    grupos[tipo][linea].push(v);
+  });
+
+  // Ordenar tipo alfabético, línea alfabético, modelo ascendente
+  const tiposOrdenados = Object.keys(grupos).sort();
+  const resultado = [];
+  let numeroCorrelativo = 1;
+
+  tiposOrdenados.forEach(tipo => {
+    const lineasOrdenadas = Object.keys(grupos[tipo]).sort();
+    lineasOrdenadas.forEach(linea => {
+      const vehiculosDeLinea = grupos[tipo][linea].sort((a, b) => (a.anio || 0) - (b.anio || 0));
+      vehiculosDeLinea.forEach(v => {
+        resultado.push({ ...v, _numero: numeroCorrelativo++, _tipo: tipo, _linea: linea });
+      });
+    });
+  });
+
+  return resultado;
+}
+
+/**
  * Genera y descarga un archivo Excel (.xlsx) con el reporte de flota vehicular
  */
 export async function exportarFlotillaXLS(vehiculos) {
@@ -19,7 +53,6 @@ export async function exportarFlotillaXLS(vehiculos) {
       fitToWidth: 1,
       margins: { left: 0.3, right: 0.3, top: 0.4, bottom: 0.4, header: 0.2, footer: 0.2 },
     },
-    views: [{ state: 'frozen', xSplit: 0, ySplit: 3 }],
   })
 
   // ── Logo ──
@@ -75,12 +108,42 @@ export async function exportarFlotillaXLS(vehiculos) {
   })
   headerRow.height = 20
 
-  // ── Datos ──
-  vehiculos.forEach((v, idx) => {
-    const rowNum = 6 + idx
-    const row = ws.getRow(rowNum)
+  // ── Agrupar y renderizar ──
+  const vehiculosAgrupados = agruparVehiculos(vehiculos)
+  let currentRowNum = 6
+  let ultimoTipo = null
+  let ultimaLinea = null
+
+  vehiculosAgrupados.forEach(v => {
+    // Encabezado de Tipo si cambió
+    if (v._tipo !== ultimoTipo) {
+      const tipoRow = ws.getRow(currentRowNum)
+      tipoRow.getCell(1).value = v._tipo
+      tipoRow.getCell(1).font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FFFFFFFF' } }
+      tipoRow.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF34495E' } }
+      ws.mergeCells(currentRowNum, 1, currentRowNum, 7)
+      tipoRow.height = 18
+      currentRowNum++
+      ultimoTipo = v._tipo
+      ultimaLinea = null
+    }
+
+    // Encabezado de Línea si cambió
+    if (v._linea !== ultimaLinea) {
+      const lineaRow = ws.getRow(currentRowNum)
+      lineaRow.getCell(1).value = `  ${v._linea}`
+      lineaRow.getCell(1).font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FF555555' } }
+      lineaRow.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFECF0F1' } }
+      ws.mergeCells(currentRowNum, 1, currentRowNum, 7)
+      lineaRow.height = 16
+      currentRowNum++
+      ultimaLinea = v._linea
+    }
+
+    // Fila de datos
+    const dataRow = ws.getRow(currentRowNum)
     const datos = [
-      idx + 1,
+      v._numero,
       v.x_studio_status_vehiculo || '—',
       v.tipo_vehiculo || '—',
       v.placa || '—',
@@ -89,11 +152,11 @@ export async function exportarFlotillaXLS(vehiculos) {
       v.anio || '—',
     ]
 
-    datos.forEach((val, colIdx) => {
-      const cell = row.getCell(colIdx + 1)
+    datos.forEach((val, idx) => {
+      const cell = dataRow.getCell(idx + 1)
       cell.value = val
       cell.font = { name: 'Calibri', size: 10 }
-      cell.alignment = { vertical: 'center', horizontal: colIdx === 0 ? 'center' : 'left', wrapText: true }
+      cell.alignment = { vertical: 'center', horizontal: idx === 0 ? 'center' : 'left', wrapText: true }
       cell.border = {
         top: { style: 'hair', color: { argb: 'FFCCCCCC' } },
         bottom: { style: 'hair', color: { argb: 'FFCCCCCC' } },
@@ -101,23 +164,23 @@ export async function exportarFlotillaXLS(vehiculos) {
         right: { style: 'hair', color: { argb: 'FFCCCCCC' } },
       }
     })
-    row.height = 18
+    dataRow.height = 17
+    currentRowNum++
   })
 
   // ── Ancho de columnas ──
   ws.columns = [
-    { width: 6 },   // No.
-    { width: 16 },  // Estado
-    { width: 18 },  // Tipo Vehículo
-    { width: 12 },  // Placa
-    { width: 14 },  // Marca
-    { width: 20 },  // Línea
-    { width: 10 },  // Modelo
+    { width: 6 },
+    { width: 16 },
+    { width: 18 },
+    { width: 12 },
+    { width: 14 },
+    { width: 20 },
+    { width: 10 },
   ]
 
   // ── Fila de totales ──
-  const totalRow = 6 + vehiculos.length
-  const rowTotales = ws.getRow(totalRow + 1)
+  const rowTotales = ws.getRow(currentRowNum + 1)
   rowTotales.getCell(1).value = 'TOTAL'
   rowTotales.getCell(1).font = { bold: true, size: 11 }
   rowTotales.getCell(2).value = vehiculos.length
@@ -144,6 +207,9 @@ export async function exportarFlotilaPDF(vehiculos) {
   const jsPDF = (await import('jspdf')).default
   const html2canvas = (await import('html2canvas')).default
 
+  // Agrupar vehículos
+  const vehiculosAgrupados = agruparVehiculos(vehiculos)
+
   // Crear un contenedor HTML temporal
   const container = document.createElement('div')
   container.style.position = 'absolute'
@@ -153,7 +219,7 @@ export async function exportarFlotilaPDF(vehiculos) {
   container.style.padding = '40px'
   container.style.fontFamily = 'Arial, sans-serif'
 
-  const html = `
+  let html = `
     <div style="text-align: center; margin-bottom: 30px;">
       <img src="/pass-35-logo.png" alt="Logo" style="width: 80px; margin-bottom: 15px;">
       <h1 style="margin: 0; font-size: 24px; color: #2C3E50;">PASS RENT A CAR GUATEMALA</h1>
@@ -176,17 +242,48 @@ export async function exportarFlotilaPDF(vehiculos) {
         </tr>
       </thead>
       <tbody>
-        ${vehiculos.map((v, idx) => `
-          <tr style="background-color: ${idx % 2 === 0 ? '#f9f9f9' : 'white'};">
-            <td style="border: 1px solid #ccc; padding: 8px; text-align: center;">${idx + 1}</td>
-            <td style="border: 1px solid #ccc; padding: 8px;">${v.x_studio_status_vehiculo || '—'}</td>
-            <td style="border: 1px solid #ccc; padding: 8px;">${v.tipo_vehiculo || '—'}</td>
-            <td style="border: 1px solid #ccc; padding: 8px; font-weight: bold;">${v.placa || '—'}</td>
-            <td style="border: 1px solid #ccc; padding: 8px;">${v.marca || '—'}</td>
-            <td style="border: 1px solid #ccc; padding: 8px;">${v.linea || '—'}</td>
-            <td style="border: 1px solid #ccc; padding: 8px; text-align: center;">${v.anio || '—'}</td>
-          </tr>
-        `).join('')}
+  `
+
+  let ultimoTipo = null
+  let ultimaLinea = null
+
+  vehiculosAgrupados.forEach(v => {
+    // Encabezado de Tipo si cambió
+    if (v._tipo !== ultimoTipo) {
+      html += `
+        <tr style="background-color: #34495E;">
+          <td colspan="7" style="border: 1px solid #ccc; padding: 10px; font-weight: bold; color: white;">${v._tipo}</td>
+        </tr>
+      `
+      ultimoTipo = v._tipo
+      ultimaLinea = null
+    }
+
+    // Encabezado de Línea si cambió
+    if (v._linea !== ultimaLinea) {
+      html += `
+        <tr style="background-color: #ECF0F1;">
+          <td colspan="7" style="border: 1px solid #ccc; padding: 8px; font-weight: bold; color: #555; font-size: 14px;">&nbsp;&nbsp;${v._linea}</td>
+        </tr>
+      `
+      ultimaLinea = v._linea
+    }
+
+    // Fila de datos
+    html += `
+      <tr style="background-color: ${vehiculosAgrupados.indexOf(v) % 2 === 0 ? '#f9f9f9' : 'white'};">
+        <td style="border: 1px solid #ccc; padding: 8px; text-align: center;">${v._numero}</td>
+        <td style="border: 1px solid #ccc; padding: 8px;">${v.x_studio_status_vehiculo || '—'}</td>
+        <td style="border: 1px solid #ccc; padding: 8px;">${v.tipo_vehiculo || '—'}</td>
+        <td style="border: 1px solid #ccc; padding: 8px; font-weight: bold;">${v.placa || '—'}</td>
+        <td style="border: 1px solid #ccc; padding: 8px;">${v.marca || '—'}</td>
+        <td style="border: 1px solid #ccc; padding: 8px;">${v.linea || '—'}</td>
+        <td style="border: 1px solid #ccc; padding: 8px; text-align: center;">${v.anio || '—'}</td>
+      </tr>
+    `
+  })
+
+  html += `
       </tbody>
     </table>
 
